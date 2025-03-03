@@ -53,7 +53,7 @@ class LocalLLMManager:
             logger.info(f"Local LLM service starting for model: {local_model_path}")
             
             # Run llama-server in the background with additional safety checks
-            self.process = subprocess.Popen(
+            process = subprocess.Popen(
                 [
                     "nohup", "llama-server",
                     "--model", local_model_path,
@@ -64,7 +64,7 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
-            self._dump_running_service(running_model, port)
+            self._dump_running_service(running_model, port, process.pid)
             logger.info(f"Local LLM service started successfully on port {port} "
                        f"for model: {running_model}")
             return True
@@ -79,9 +79,9 @@ class LocalLLMManager:
             logger.error(f"Unexpected error starting LLM service: {str(e)}", exc_info=True)
             return False
         
-    def _dump_running_service(self, name, port):
+    def _dump_running_service(self, name, port, pid):
         """Dump the running service details to a file."""
-        service_info = {"name": name, "port": port}
+        service_info = {"name": name, "port": port, "pid": pid}
         with open("running_service.pkl", "wb") as f:
             pickle.dump(service_info, f)
 
