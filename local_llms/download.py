@@ -95,10 +95,6 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
     input_link = os.path.join(BASE_URL, filecoin_hash)
     logger = setup_logging()
     model_dir = None
-    local_path = output_dir/POSTFIX_MODEL_PATH
-    if os.path.exists(local_path):
-        logger.info(f"Model already exists at: {local_path}")
-        return local_path
     
     try:
         logger.info(f"Initiating download process for: {input_link}")
@@ -113,6 +109,10 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
 
         # Setup paths
         model_name = data['model']
+        local_path = str(output_dir/model_name)  + POSTFIX_MODEL_PATH
+        if os.path.exists(local_path):
+            logger.info(f"Model already exists at: {local_path}")
+            return local_path
         num_files = data['num_of_file']
         model_dir = Path(model_name)
         logger.info(f"Model identified: {model_name} with {num_files} files")
