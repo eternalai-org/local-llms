@@ -8,7 +8,8 @@ setup(
     install_requires=[
         "requests",
         "tqdm",
-        "loguru"
+        "loguru",
+        "psutil"
     ],
     entry_points={
         "console_scripts": [
