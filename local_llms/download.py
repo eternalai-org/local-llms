@@ -14,7 +14,8 @@ from typing import Dict, Tuple, Optional
 CHUNK_SIZE = 8192
 BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "models"
-SLEEP_TIME = 2
+SLEEP_TIME = 5
+POSTFIX_MODEL_PATH = ".gguf"
 
 def setup_logging() -> logging.Logger:
     """Configure and return a logger instance with detailed settings"""
@@ -168,7 +169,7 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
                    f"{num_files} files processed")
         cur_model_path = output_dir/model_name
         logger.info(f"Model path: {cur_model_path}")
-        local_path = output_dir + ".gguf"
+        local_path = output_dir/POSTFIX_MODEL_PATH
         logger.info(f"Moving model to expected path: {local_path}")
         shutil.move(cur_model_path, local_path)
         logger.info(f"Model moved successfully to: {local_path}")
