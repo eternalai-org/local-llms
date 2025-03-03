@@ -1,7 +1,9 @@
-from loguru import logger
-import subprocess
-from typing import Optional
 import os
+import pickle
+import psutil
+import subprocess
+from loguru import logger
+from typing import Optional
 from local_llms.download import download_and_extract_model
 
 class LocalLLMManager:
@@ -72,6 +74,12 @@ class LocalLLMManager:
         except Exception as e:
             logger.error(f"Unexpected error starting LLM service: {str(e)}", exc_info=True)
             return False
+        
+    def _dump_running_service(self, name, port):
+        """Dump the running service details to a file."""
+        service_info = {"name": name, "port": port}
+        with open("running_service.pkl", "wb") as f:
+            pickle.dump(service_info, f)
 
     def stop(self) -> bool:
         """
@@ -80,26 +88,37 @@ class LocalLLMManager:
         Returns:
             bool: True if the service stopped successfully, False otherwise.
         """
-        if not hasattr(self, "process") or self.process is None:
+        if not os.path.exists("running_service.pkl"):
             logger.warning("No running LLM service to stop.")
             return False
 
         try:
-            logger.info(f"Stopping LLM service running on port {self.port}...")
-            self.process.terminate()  # Send SIGTERM
-            self.process.wait(timeout=5)  # Wait for clean shutdown
+            # Load service details from the pickle file
+            with open("running_service.pkl", "rb") as f:
+                service_info = pickle.load(f)
+            
+            port = service_info.get("port")
+            name = service_info.get("name")
+            pid = service_info.get("pid")
 
-            if self.process.poll() is None:  # If process is still running, force kill
-                logger.warning("Process did not terminate, forcing kill.")
-                self.process.kill()
+            logger.info(f"Stopping LLM service '{name}' running on port {port} (PID: {pid})...")
 
-            self.process = None
-            self.running_model = None
-            self.port = None
+            # Terminate process by PID
+            if psutil.pid_exists(pid):
+                process = psutil.Process(pid)
+                process.terminate()
+                process.wait(timeout=5)  # Allow process to shut down gracefully
+                
+                if process.is_running():  # Force kill if still alive
+                    logger.warning("Process did not terminate, forcing kill.")
+                    process.kill()
 
+            # Remove the tracking file
+            os.remove("running_service.pkl")
             logger.info("LLM service stopped successfully.")
             return True
 
         except Exception as e:
             logger.error(f"Error stopping LLM service: {str(e)}", exc_info=True)
             return False
+        
