@@ -47,14 +47,14 @@ class LocalLLMManager:
             # Run llama-server in the background with additional safety checks
             self.process = subprocess.Popen(
                 [
-                    "llama-server",
+                    "nohup", "llama-server",
                     "--model", local_model_path,
                     "--port", str(port),
                     "--host", host,
                 ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                preexec_fn=os.setsid  # Ensures process survives parent termination
             )
             
             self.running_model = os.path.basename(local_model_path)

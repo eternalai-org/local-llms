@@ -14,6 +14,15 @@ bash mac.sh
 
 After installation, you can verify that everything was set up correctly by checking the version of the toolkit:
 ```bash
+source local_llms/bin/activate
 local-llms --version
 ```
 If you see the version number output, the installation is successful and you’re ready to start using Local LLMs Toolkit on your machine!
+
+## Usage
+### Start a Local LLM
+To start a local LLM, run the following command:
+```bash
+local-llms start --hash <filecoin_hash>
+```
+Replace `<filecoin_hash>` with the cid of the LLM you want to start.
