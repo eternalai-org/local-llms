@@ -45,6 +45,10 @@ def handle_start(args):
     if not manager.start(args.hash, args.port, args.host):
         sys.exit(1)
 
+def handle_stop(args):
+    if not manager.stop():
+        sys.exit(1)
+
 def main():
     known_args, unknown_args = parse_args()
     for arg in unknown_args:
@@ -55,6 +59,8 @@ def main():
         version_command()
     elif known_args.command == "start":
         handle_start(known_args)
+    elif known_args.command == "stop":
+        handle_stop(known_args)
 
 
 if __name__ == "__main__":
