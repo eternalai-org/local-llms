@@ -75,78 +75,31 @@ class LocalLLMManager:
 
     def stop(self) -> bool:
         """
-        Stop the local LLM service.
-        
+        Stop the running LLM service.
+
         Returns:
-            bool: True if service stopped successfully, False otherwise
+            bool: True if the service stopped successfully, False otherwise.
         """
-        if not self.process or self.process.poll() is not None:
-            logger.warning("No running LLM service to stop")
+        if not hasattr(self, "process") or self.process is None:
+            logger.warning("No running LLM service to stop.")
             return False
-            
+
         try:
-            logger.info(f"Stopping local LLM service for model: {self.running_model}")
-            self.process.terminate()
-            
-            # Wait for process to terminate with timeout
-            self.process.wait(timeout=10)
-            
-            logger.info(f"Local LLM service stopped successfully for model: {self.running_model}")
-            self._cleanup()
+            logger.info(f"Stopping LLM service running on port {self.port}...")
+            self.process.terminate()  # Send SIGTERM
+            self.process.wait(timeout=5)  # Wait for clean shutdown
+
+            if self.process.poll() is None:  # If process is still running, force kill
+                logger.warning("Process did not terminate, forcing kill.")
+                self.process.kill()
+
+            self.process = None
+            self.running_model = None
+            self.port = None
+
+            logger.info("LLM service stopped successfully.")
             return True
-            
-        except subprocess.TimeoutExpired:
-            logger.warning("Graceful termination failed, forcing process kill")
-            self.process.kill()
-            self._cleanup()
-            return True
+
         except Exception as e:
-            logger.error(f"Failed to stop local LLM service: {str(e)}", exc_info=True)
+            logger.error(f"Error stopping LLM service: {str(e)}", exc_info=True)
             return False
-
-    def status(self) -> dict:
-        """
-        Check the status of the local LLM service.
-        
-        Returns:
-            dict: Status information including running state, model name, and port
-        """
-        status_info = {
-            "state": "Stopped",
-            "model": None,
-            "port": None
-        }
-        
-        if self.process and self.process.poll() is None:
-            status_info.update({
-                "state": "Running",
-                "model": self.running_model,
-                "port": self.port
-            })
-            logger.info(f"Local LLM service is running for model: {self.running_model} "
-                       f"on port: {self.port}")
-        else:
-            logger.info("Local LLM service is not running")
-            
-        return status_info
-
-    def _cleanup(self) -> None:
-        """Reset instance variables after stopping the service."""
-        self.process = None
-        self.running_model = None
-        self.port = None
-
-    def get_logs(self) -> Optional[str]:
-        """
-        Retrieve logs from the running process.
-        
-        Returns:
-            Optional[str]: Process logs if available, None otherwise
-        """
-        if self.process and self.process.poll() is None:
-            try:
-                stdout, stderr = self.process.communicate(timeout=1)
-                return f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}"
-            except subprocess.TimeoutExpired:
-                return "Process still running, logs not fully available"
-        return None
