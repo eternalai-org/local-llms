@@ -170,7 +170,7 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
 
         logger.info(f"Process completed successfully for {model_name}: "
                    f"{num_files} files processed")
-        cur_model_path = output_dir/model_name
+        cur_model_path = output_dir/model_name/model_name
         logger.info(f"Model path: {cur_model_path}")
         logger.info(f"Moving model to expected path: {local_path}")
         shutil.move(cur_model_path, local_path)
