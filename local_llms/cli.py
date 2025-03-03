@@ -25,7 +25,7 @@ def parse_args():
         help="Port number for the local language model server"
     )
     start_command.add_argument(
-        "--host", type=str, default="localhost",
+        "--host", type=str, default="0.0.0.0",
         help="Host address for the local language model server"
     )
     stop_command = subparsers.add_parser(
@@ -42,7 +42,7 @@ def version_command():
     )
 
 def handle_start(args):
-    if not manager.start(args.hash, args.port):
+    if not manager.start(args.hash, args.port, args.host):
         sys.exit(1)
 
 def main():

@@ -13,7 +13,7 @@ class LocalLLMManager:
         self.process: Optional[subprocess.Popen] = None
         self.port: Optional[int] = None
 
-    def start(self, hash: str = None, port: int = 8080) -> bool:
+    def start(self, hash: str = None, port: int = 8080, host: str = "0.0.0.0") -> bool:
         """
         Start the local LLM service in the background.
         
@@ -50,6 +50,7 @@ class LocalLLMManager:
                     "llama-server",
                     "--model", local_model_path,
                     "--port", str(port),
+                    "--host", host,
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
