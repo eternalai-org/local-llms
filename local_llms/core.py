@@ -2,6 +2,7 @@ import os
 import pickle
 import psutil
 import subprocess
+from pathlib import Path
 from loguru import logger
 from typing import Optional
 from local_llms.download import download_and_extract_model
@@ -10,12 +11,10 @@ class LocalLLMManager:
     """Manages a local Large Language Model (LLM) service."""
     
     def __init__(self):
-        """Initialize the LocalLLMManager."""
-        self.running_model: Optional[str] = None
-        self.process: Optional[subprocess.Popen] = None
-        self.port: Optional[int] = None
+        """Initialize the LocalLLMManager."""       
+        self.pickle_file = Path.cwd()/ "running_service.pkl"
 
-    def start(self, hash: str = None, port: int = 8080, host: str = "0.0.0.0") -> bool:
+    def start(self, hash: str, port: int = 8080, host: str = "0.0.0.0") -> bool:
         """
         Start the local LLM service in the background.
         
@@ -29,16 +28,23 @@ class LocalLLMManager:
         Raises:
             ValueError: If hash is not provided when no model is running
         """
-        if self.running_model is not None:
-            logger.warning(f"Service already running with model: {self.running_model}")
-            return False
-            
         if not hash:
             raise ValueError("Filecoin hash is required to start the service")
-            
+         
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
             local_model_path = download_and_extract_model(hash)
+            running_model = os.path.basename(local_model_path)
+            if os.path.exists("running_service.pkl"):
+                with open("running_service.pkl", "rb") as f:
+                    service_info = pickle.load(f)
+                    name = service_info.get("name")
+                    if name == running_model:
+                        logger.warning(f"Model '{name}' is already running on port {service_info.get('port')}")
+                        return False
+                    else:
+                        logger.info(f"Stopping existing model '{name}' running on port {service_info.get('port')}")
+                        self.stop()
             
             if not os.path.exists(local_model_path):
                 logger.error(f"Model file not found at: {local_model_path}")
@@ -58,11 +64,9 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
-            
-            self.running_model = os.path.basename(local_model_path)
-            self.port = port
+            self._dump_running_service(running_model, port)
             logger.info(f"Local LLM service started successfully on port {port} "
-                       f"for model: {self.running_model}")
+                       f"for model: {running_model}")
             return True
             
         except FileNotFoundError:

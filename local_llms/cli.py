@@ -1,5 +1,6 @@
 import sys
 import argparse
+from pathlib import Path
 from loguru import logger
 from local_llms import __version__
 from local_llms.core import LocalLLMManager
