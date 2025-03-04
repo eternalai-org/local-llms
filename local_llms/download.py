@@ -32,7 +32,7 @@ def setup_logging() -> logging.Logger:
 def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
     """Check if the model files are already downloaded."""
     if output_file is None:
-        output_file = DEFAULT_OUTPUT_DIR / f"{filecoin_hash}.json"
+        output_file = Path.cwd() / f"{filecoin_hash}.json"
     input_link = os.path.join(BASE_URL, filecoin_hash)
     logger = setup_logging()
     response = requests.get(input_link, timeout=10)
@@ -40,7 +40,8 @@ def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
     logger.debug(f"Metadata response status: {response.status_code}")
     data = response.json()
     logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
-    local_path =  DEFAULT_OUTPUT_DIR + POSTFIX_MODEL_PATH
+    model_name = data['model']
+    local_path = os.path.join(str(DEFAULT_OUTPUT_DIR), model_name + POSTFIX_MODEL_PATH)
     metadata = {
         "is_downloaded": False,
         "model_path": local_path,
