@@ -40,7 +40,7 @@ def parse_args():
        "download", help="Download and extract model files from IPFS"
     )
     download_command.add_argument(
-        "--filecoin-hash", required=True,
+        "--hash", required=True,
         help="IPFS hash of the model metadata"
     )
     download_command.add_argument(

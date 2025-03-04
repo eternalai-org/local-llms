@@ -20,6 +20,13 @@ local-llms version
 If you see the version number output, the installation is successful and you’re ready to start using Local LLMs Toolkit on your machine!
 
 ## Usage
+
+### Download model from Filecoin
+To download a model from Filecoin, run the following command:
+```bash
+local-llms download --hash <filecoin_hash>
+```
+
 ### Start a Local LLM
 To start a local LLM, run the following command:
 ```bash
