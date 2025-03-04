@@ -55,14 +55,14 @@ def parse_args():
         "--output-dir", type=Path,
         help="Output directory for model files"
     )
-    check_downloaded_command = subparsers.add_parser(
+    check_command = subparsers.add_parser(
         "check", help="Model metadata check"
     )
-    check_downloaded_command.add_argument(
+    check_command.add_argument(
         "--hash", type=str, required=True,
         help="Filecoin hash of the model to check"
     )
-    check_downloaded_command.add_argument(
+    check_command.add_argument(
         "--output-file", type = str, default = None
     )
     return parser.parse_known_args()
