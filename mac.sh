@@ -51,7 +51,7 @@ log "llama.cpp setup complete."
 
 # Step 6: Set up local-llms toolkit
 log "Setting up local-llms toolkit..."
-pip3 uninstall local-llms
+pip3 uninstall local-llms -y
 pip3 install git+https://github.com/eternalai-org/local-llms.git
 log "local-llms toolkit setup completed."
 
