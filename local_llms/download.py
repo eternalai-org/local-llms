@@ -63,6 +63,10 @@ def check_downloaded_model(filecoin_hash: str, output_file: Optional[Path] = Non
                 "is_downloaded": is_downloaded,
                 "model_path": str(local_path),
             }
+            # Convert to Path if it's a string
+            if isinstance(output_file, str):
+                output_file = Path.cwd()/output_file
+
             output_file.parent.mkdir(parents=True, exist_ok=True)
             with open(output_file, "w") as f:
                 json.dump(metadata, f)
