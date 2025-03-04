@@ -75,11 +75,11 @@ def check_downloaded_model(filecoin_hash: str, output_file: Optional[Path] = Non
         if is_downloaded:
             logger.info(f"Model already exists at: {local_path}")
             
-        return "True" if is_downloaded else "False"
+        return is_downloaded
         
     except requests.RequestException as e:
         logger.error(f"Failed to fetch model metadata: {e}")
-        return "False"
+        return False
 
 
 def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = CHUNK_SIZE) -> Tuple[bool, str]:

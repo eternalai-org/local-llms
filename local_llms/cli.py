@@ -84,7 +84,12 @@ def handle_stop(args):
         sys.exit(1)
     
 def handle_check(args):
-    check_downloaded_model(args.hash, args.output_file)
+    is_downloaded = check_downloaded_model(args.hash, args.output_file)
+    # return "True" string
+    if is_downloaded:
+        print("True")
+    else:
+        print("False")
 
 def main():
     known_args, unknown_args = parse_args()
