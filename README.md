@@ -25,4 +25,14 @@ To start a local LLM, run the following command:
 ```bash
 local-llms start --hash <filecoin_hash>
 ```
-Replace `<filecoin_hash>` with the cid of the LLM you want to start.
+Replace `<filecoin_hash>` with the cid of the LLM you want to start. For example:
+
+```bash
+local-llms start --hash bafkreih572a2uvcvyzpvdhvbgrplf6jdfgcvstb5ahvk7nxmlh7r2wfzve
+```
+
+### Stop a Local LLM
+To stop a local LLM, run the following command:
+```bash
+local-llms stop
+```

@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional
 
 # Constants
-CHUNK_SIZE = 8192
 BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "models"
 SLEEP_TIME = 5
@@ -26,7 +25,7 @@ def setup_logging() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-def download_file(file_info: Dict[str, str], model_dir: Path) -> Tuple[bool, str]:
+def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int) -> Tuple[bool, str]:
     """Download a single file with a progress bar and one retry on failure, removing old file on retry"""
     logger = logging.getLogger(__name__)
     file_name = file_info['file']
@@ -64,7 +63,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path) -> Tuple[bool, str
                 with open(file_path, 'wb') as f:
                     logger.debug(f"Opened file for writing: {file_path}")
                     downloaded_size = 0
-                    for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                    for chunk in response.iter_content(chunk_size=chunk_size):
                         if chunk:
                             size = len(chunk)
                             downloaded_size += size
@@ -84,7 +83,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path) -> Tuple[bool, str
             logger.info(f"Retrying download for {file_name}...")
             time.sleep(SLEEP_TIME)  # Small delay before retry
 
-def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
+def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
     """
     Download and extract model files from IPFS link in parallel with detailed logging.
     
@@ -105,7 +104,7 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         response.raise_for_status()
         logger.debug(f"Metadata response status: {response.status_code}")
         data = response.json()
-        logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys")
+        logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
 
         # Setup paths
         model_name = data['model']
@@ -131,7 +130,7 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         logger.debug(f"Starting ThreadPoolExecutor with {max_workers} workers")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_file = {
-                executor.submit(download_file, file_info, model_dir): file_info
+                executor.submit(download_file, file_info, model_dir, chunk_size): file_info
                 for file_info in data['files']
             }
             logger.debug(f"Submitted {len(future_to_file)} download tasks")
@@ -212,6 +211,12 @@ def parse_args():
         help="Maximum number of parallel downloads (defaults to CPU count * 2)"
     )
     parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1024,
+        help="Chunk size for downloading files (default: 1024)"
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
@@ -221,4 +226,4 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    download_and_extract_model(args.filecoin_hash, max_workers=args.max_workers, output_dir= args.output_dir)
+    download_and_extract_model(args.filecoin_hash, max_workers=args.max_workers, chunk_size = args.chunk_size, output_dir= args.output_dir)
