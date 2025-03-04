@@ -35,12 +35,35 @@ def parse_args():
     version_command = subparsers.add_parser(
         "version", help="Print the version of local_llms"
     )
+    download_command = subparsers.add_parser(
+       "download", help="Download and extract model files from IPFS"
+    )
+    download_command.add_argument(
+        "--filecoin-hash", required=True,
+        help="IPFS hash of the model metadata"
+    )
+    download_command.add_argument(
+        "--max-workers", type=int, default=8,
+        help="Maximum number of parallel downloads"
+    )
+    download_command.add_argument(
+        "--chunk-size", type=int, default=1024,
+        help="Chunk size for downloading files"
+    )
+    download_command.add_argument(
+        "--output-dir", type=Path,
+        help="Output directory for model files"
+    )
     return parser.parse_known_args()
 
 def version_command():
     logger.info(
         f"Local LLMS (Large Language Model Service) version: {__version__}"
     )
+
+def handle_download(args):
+    if not manager.download(args.filecoin_hash, args.max_workers, args.chunk_size, args.output_dir):
+        sys.exit(1)
 
 def handle_start(args):
     if not manager.start(args.hash, args.port, args.host):
@@ -62,6 +85,11 @@ def main():
         handle_start(known_args)
     elif known_args.command == "stop":
         handle_stop(known_args)
+    elif known_args.command == "download":
+        handle_download(known_args)
+    else:
+        logger.error(f"Unknown command: {known_args.command}")
+        sys.exit(2)
 
 
 if __name__ == "__main__":
