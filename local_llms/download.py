@@ -209,9 +209,9 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
 
         # Extract files
         extract_cmd = (
-            f"cat {temp_dir}/{model_name}.zip.part-* | "
+            f"cat '{temp_dir}/{model_name}'.zip.part-* | "
             f"pigz -p {os.cpu_count()} -d | "
-            f"tar -xf - -C {output_dir}"
+            f"tar -xf - -C '{output_dir}'"
         )
         logger.info("Extracting model files...")
         subprocess.run(extract_cmd, shell=True, check=True, capture_output=True, text=True)
