@@ -20,6 +20,7 @@ MAX_ATTEMPTS = 3
 CHUNK_SIZE = 16384
 POSTFIX_MODEL_PATH = ".gguf"
 
+
 def setup_logging() -> logging.Logger:
     """Configure and return a logger instance with detailed settings"""
     logging.basicConfig(
@@ -49,10 +50,10 @@ def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
     if os.path.exists(local_path):
         logger.info(f"Model already exists at: {local_path}")
         metadata["is_downloaded"] = True
-        with open(output_file, "w") as f:
-            json.dump(metadata, f)
         logger.info(f"Metadata saved to: {output_file}")
         return True
+    with open(output_file, "w") as f:
+        json.dump(metadata, f)
     return False
 
 
