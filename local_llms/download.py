@@ -14,7 +14,7 @@ import json
 
 # Constants
 BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
-DEFAULT_OUTPUT_DIR = Path.cwd() / "models"
+DEFAULT_OUTPUT_DIR = Path.cwd() / "llms-storage"
 SLEEP_TIME = 5
 MAX_ATTEMPTS = 3
 CHUNK_SIZE = 16384
@@ -30,31 +30,52 @@ def setup_logging() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
-    """Check if the model files are already downloaded."""
-    if output_file is None:
-        output_file = Path.cwd() / f"{filecoin_hash}.json"
-    input_link = os.path.join(BASE_URL, filecoin_hash)
-    logger = setup_logging()
-    response = requests.get(input_link, timeout=10)
-    response.raise_for_status()
-    logger.debug(f"Metadata response status: {response.status_code}")
-    data = response.json()
-    logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
-    model_name = data['model']
-    local_path = str(DEFAULT_OUTPUT_DIR/model_name) + POSTFIX_MODEL_PATH
-    metadata = {
-        "is_downloaded": False,
-        "model_path": local_path,
-    }
-    if os.path.exists(local_path):
-        logger.info(f"Model already exists at: {local_path}")
-        metadata["is_downloaded"] = True
-        logger.info(f"Metadata saved to: {output_file}")
-        return True
-    with open(output_file, "w") as f:
-        json.dump(metadata, f)
-    return False
+def check_downloaded_model(filecoin_hash: str, output_file: Optional[Path] = None) -> bool:
+    """
+    Check if the model is already downloaded and optionally save metadata.
+    
+    Args:
+        filecoin_hash: IPFS hash of the model metadata
+        output_file: Optional path to save metadata JSON
+    
+    Returns:
+        bool: Whether the model is already downloaded
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Fetch metadata only once
+    input_link = f"{BASE_URL}{filecoin_hash}"
+    try:
+        response = requests.get(input_link, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Build paths using pathlib consistently
+        model_name = data['model']
+        local_path = DEFAULT_OUTPUT_DIR / f"{model_name}{POSTFIX_MODEL_PATH}"
+        
+        # Check if model exists
+        is_downloaded = local_path.exists()
+        
+        # Write metadata only if output_file is provided
+        if output_file:
+            metadata = {
+                "is_downloaded": is_downloaded,
+                "model_path": str(local_path),
+            }
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_file, "w") as f:
+                json.dump(metadata, f)
+            logger.debug(f"Metadata saved to: {output_file}")
+            
+        if is_downloaded:
+            logger.info(f"Model already exists at: {local_path}")
+            
+        return is_downloaded
+        
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch model metadata: {e}")
+        return False
 
 
 def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = CHUNK_SIZE) -> Tuple[bool, str]:
@@ -117,148 +138,101 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
 
     return False, file_name
 
-def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = None) -> None:
+def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, 
+                              chunk_size: int = 1024, output_dir: Optional[Path] = None) -> Optional[Path]:
     """
     Download and extract model files from IPFS link in parallel with detailed logging.
     
     Args:
-        input_link: IPFS gateway URL containing model metadata
+        filecoin_hash: IPFS hash of the model metadata
         max_workers: Maximum number of parallel downloads
+        chunk_size: Size of download chunks in bytes
+        output_dir: Directory to save the model files
+        
+    Returns:
+        Path to the downloaded model or None if failed
     """
-    if output_dir is None:
-        output_dir = DEFAULT_OUTPUT_DIR
-    input_link = os.path.join(BASE_URL, filecoin_hash)
-    logger = setup_logging()
-    model_dir = None
+    output_dir = output_dir or DEFAULT_OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(__name__)
+    temp_dir = None
+    
+    # Check if model is already downloaded
+    metadata_path = output_dir / ".metadata.json"
+    if check_downloaded_model(filecoin_hash, metadata_path):
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+            return Path(metadata["model_path"])
+    
     try:
+        # Fetch metadata
+        input_link = f"{BASE_URL}{filecoin_hash}"
         logger.info(f"Initiating download process for: {input_link}")
         
-        # Fetch metadata
-        logger.debug(f"Sending GET request to fetch metadata from {input_link}")
         response = requests.get(input_link, timeout=10)
         response.raise_for_status()
-        logger.debug(f"Metadata response status: {response.status_code}")
         data = response.json()
-        logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
 
-        # Setup paths
+        # Setup paths and prepare directories
         model_name = data['model']
-        local_path = str(output_dir/model_name)  + POSTFIX_MODEL_PATH
-        if os.path.exists(local_path):
-            logger.info(f"Model already exists at: {local_path}")
-            return local_path
-        num_files = data['num_of_file']
-        model_dir = Path(model_name)
-        logger.info(f"Model identified: {model_name} with {num_files} files")
+        local_path = output_dir / f"{model_name}{POSTFIX_MODEL_PATH}"
+        temp_dir = Path(model_name)
+        temp_dir.mkdir(exist_ok=True)
         
-        logger.debug(f"Creating directory if not exists: {model_dir}")
-        model_dir.mkdir(exist_ok=True)
-        logger.info(f"Working directory prepared: {model_dir.absolute()}")
+        num_files = data['num_of_file']
+        logger.info(f"Downloading {model_name}: {num_files} files")
 
-        # Optimize max_workers
+        # Configure parallel downloads
         max_workers = max_workers or min(os.cpu_count() * 2, num_files)
-        logger.info(f"Configuring parallel download with {max_workers} workers "
-                   f"(CPU count: {os.cpu_count()})")
-
-        # Parallel downloads
+        
+        # Download files in parallel
         successful_downloads = 0
-        logger.debug(f"Starting ThreadPoolExecutor with {max_workers} workers")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {
-                executor.submit(download_file, file_info, model_dir, chunk_size): file_info
+            futures = {
+                executor.submit(download_file, file_info, temp_dir, chunk_size): file_info
                 for file_info in data['files']
             }
-            logger.debug(f"Submitted {len(future_to_file)} download tasks")
             
-            for future in as_completed(future_to_file):
+            for future in as_completed(futures):
                 success, file_name = future.result()
                 if success:
                     successful_downloads += 1
-                    logger.info(f"Download success #{successful_downloads}: {file_name}")
                 else:
                     logger.warning(f"Download failed: {file_name}")
         
-        logger.info(f"Download phase completed: {successful_downloads}/{num_files} successful")
         if successful_downloads != num_files:
-            raise RuntimeError(f"Partial download failure: {successful_downloads}/{num_files} files")
+            raise RuntimeError(f"Incomplete download: {successful_downloads}/{num_files} files")
 
-        # Extraction
-        logger.debug(f"Preparing extraction directory: {output_dir}")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
+        # Extract files
         extract_cmd = (
-            f"cat {model_dir}/{model_name}.zip.part-* | "
+            f"cat {temp_dir}/{model_name}.zip.part-* | "
             f"pigz -p {os.cpu_count()} -d | "
             f"tar -xf - -C {output_dir}"
         )
-        logger.info(f"Executing extraction command: {extract_cmd}")
-        process = subprocess.run(extract_cmd, shell=True, check=True, capture_output=True, text=True)
-        logger.debug(f"Extraction output: {process.stdout}")
-        logger.info("Extraction completed successfully")
-
-        # Cleanup
-        cleanup_cmd = f"rm -rf {model_dir}"
-        logger.info(f"Executing cleanup command: {cleanup_cmd}")
-        process = subprocess.run(cleanup_cmd, shell=True, check=True, capture_output=True, text=True)
-        logger.info(f"Cleanup completed - temporary files removed")
-
-        logger.info(f"Process completed successfully for {model_name}: "
-                   f"{num_files} files processed")
-        cur_model_path = output_dir/model_name/model_name
-        logger.info(f"Model path: {cur_model_path}")
-        logger.info(f"Moving model to expected path: {local_path}")
-        shutil.move(cur_model_path, local_path)
-        logger.info(f"Model moved successfully to: {local_path}")
+        logger.info("Extracting model files...")
+        subprocess.run(extract_cmd, shell=True, check=True, capture_output=True, text=True)
+        
+        # Move model file to final location
+        source_path = output_dir / model_name / model_name
+        logger.info(f"Moving model to {local_path}")
+        shutil.move(source_path, local_path)
+        
+        # Cleanup temp directories
+        shutil.rmtree(output_dir / model_name, ignore_errors=True)
+        
+        logger.info(f"Model successfully downloaded to {local_path}")
+        return local_path
 
     except requests.RequestException as e:
-        logger.error(f"Network error during metadata fetch: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Network error: {e}")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Extraction process failed: {str(e)}", exc_info=True)
-        logger.debug(f"Process stderr: {e.stderr}")
-        raise
+        logger.error(f"Extraction failed: {e.stderr}")
     except Exception as e:
-        logger.error(f"Unexpected error occurred: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Error: {e}")
     finally:
-        if model_dir and model_dir.exists():
-            try:
-                logger.debug(f"Performing cleanup in finally block for {model_dir}")
-                shutil.rmtree(model_dir, ignore_errors=True)
-                shutil.rmtree(output_dir/model_name, ignore_errors=True)
-                logger.info("Cleanup in finally block completed")
-            except Exception as e:
-                logger.error(f"Cleanup in finally block failed: {str(e)}", exc_info=True)
-    return local_path
-
-def parse_args():
-    """Parse command-line arguments"""
-    parser = argparse.ArgumentParser(description="Download and extract model files from IPFS")
-    parser.add_argument(
-        "--filecoin-hash",
-        required=True,
-        help="IPFS hash of the model metadata (e.g., bafkreieglfaposr5fggc7ebfcok7dupfoiwojjvrck6hbzjajs6nywx6qi)"
-    )
-    parser.add_argument(
-        "--max-workers",
-        type=int,
-        default=8,
-        help="Maximum number of parallel downloads (defaults to CPU count * 2)"
-    )
-    parser.add_argument(
-        "--chunk-size",
-        type=int,
-        default=1024,
-        help="Chunk size for downloading files (default: 1024)"
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help="Output directory for model files"
-    )
-    return parser.parse_args()
-
-if __name__ == "__main__":
-    args = parse_args()
-    download_and_extract_model(args.filecoin_hash, max_workers=args.max_workers, chunk_size = args.chunk_size, output_dir= args.output_dir)
+        # Ensure cleanup even if errors occurred
+        if temp_dir and temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            logger.debug(f"Temporary directory {temp_dir} removed")
+    
+    return None
