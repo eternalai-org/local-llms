@@ -4,6 +4,7 @@ from pathlib import Path
 from loguru import logger
 from local_llms import __version__
 from local_llms.core import LocalLLMManager
+from local_llms.download import check_downloaded_model, download_and_extract_model
 
 manager = LocalLLMManager()
 
@@ -54,6 +55,16 @@ def parse_args():
         "--output-dir", type=Path,
         help="Output directory for model files"
     )
+    check_downloaded_command = subparsers.add_parser(
+        "check", help="Model metadata check"
+    )
+    check_downloaded_command.add_argument(
+        "--hash", type=str, required=True,
+        help="Filecoin hash of the model to check"
+    )
+    check_downloaded_command.add_argument(
+        "--output-file", type = str, default = None
+    )
     return parser.parse_known_args()
 
 def version_command():
@@ -62,8 +73,7 @@ def version_command():
     )
 
 def handle_download(args):
-    if not manager.download(args.filecoin_hash, args.max_workers, args.chunk_size, args.output_dir):
-        sys.exit(1)
+    download_and_extract_model(args.filecoin_hash, args.max_workers, args.chunk_size, args.output_dir)
 
 def handle_start(args):
     if not manager.start(args.hash, args.port, args.host):
@@ -72,6 +82,9 @@ def handle_start(args):
 def handle_stop(args):
     if not manager.stop():
         sys.exit(1)
+    
+def handle_downloaded(args):
+    check_downloaded_model(args.hash, args.output_file)
 
 def main():
     known_args, unknown_args = parse_args()
@@ -87,6 +100,8 @@ def main():
         handle_stop(known_args)
     elif known_args.command == "download":
         handle_download(known_args)
+    elif known_args.command == "check":
+        
     else:
         logger.error(f"Unknown command: {known_args.command}")
         sys.exit(2)

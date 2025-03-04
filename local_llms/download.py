@@ -9,11 +9,15 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Tuple, Optional
+import httpx
+import json
 
 # Constants
 BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "models"
 SLEEP_TIME = 5
+MAX_ATTEMPTS = 3
+CHUNK_SIZE = 16384
 POSTFIX_MODEL_PATH = ".gguf"
 
 def setup_logging() -> logging.Logger:
@@ -25,63 +29,91 @@ def setup_logging() -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int) -> Tuple[bool, str]:
-    """Download a single file with a progress bar and one retry on failure, removing old file on retry"""
+def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
+    """Check if the model files are already downloaded."""
+    if output_file is None:
+        output_file = DEFAULT_OUTPUT_DIR / f"{filecoin_hash}.json"
+    input_link = os.path.join(BASE_URL, filecoin_hash)
+    logger = setup_logging()
+    response = requests.get(input_link, timeout=10)
+    response.raise_for_status()
+    logger.debug(f"Metadata response status: {response.status_code}")
+    data = response.json()
+    logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
+    local_path =  DEFAULT_OUTPUT_DIR + POSTFIX_MODEL_PATH
+    metadata = {
+        "is_downloaded": False,
+        "model_path": local_path,
+    }
+    if os.path.exists(local_path):
+        logger.info(f"Model already exists at: {local_path}")
+        metadata["is_downloaded"] = True
+        with open(output_file, "w") as f:
+            json.dump(metadata, f)
+        logger.info(f"Metadata saved to: {output_file}")
+        return True
+    return False
+
+
+def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = CHUNK_SIZE) -> Tuple[bool, str]:
+    """Download a file with resume support using HTTPX."""
     logger = logging.getLogger(__name__)
-    file_name = file_info['file']
-    hash_value = file_info['hash']
+    file_name = file_info["file"]
+    hash_value = file_info["hash"]
     file_url = f"{BASE_URL}{hash_value}"
     file_path = model_dir / file_name
-    max_attempts = 2 
 
-    for attempt in range(max_attempts):
-        # Remove existing file before each attempt if it exists
-        if attempt > 0 and file_path.exists():
-            try:
-                logger.debug(f"Removing existing file before retry: {file_path}")
-                os.remove(file_path)
-            except OSError as e:
-                logger.warning(f"Failed to remove old file {file_path}: {str(e)}")
-
+    for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            logger.info(f"Preparing to download: {file_name} from {file_url} (Attempt {attempt + 1}/{max_attempts})")
-            with requests.get(file_url, stream=True, timeout=30) as response:
+            headers = {}
+            existing_size = file_path.stat().st_size if file_path.exists() else 0
+
+            with httpx.Client(follow_redirects=True, timeout=60) as client:
+                # Check total file size
+                response = client.head(file_url)
                 response.raise_for_status()
-                total_size = int(response.headers.get('content-length', 0))
-                logger.debug(f"File size reported: {total_size} bytes")
+                total_size = int(response.headers.get("content-length", 0))
 
-                # Setup tqdm progress bar
-                progress_bar = tqdm(
-                    total=total_size,
-                    unit='iB',
-                    unit_scale=True,
-                    desc=file_name,
-                    leave=True,
-                    ncols=100,
-                )
+                # Resume download if possible
+                if existing_size and existing_size < total_size:
+                    headers["Range"] = f"bytes={existing_size}-"
+                    logger.info(f"Resuming download from {existing_size} bytes")
 
-                with open(file_path, 'wb') as f:
-                    logger.debug(f"Opened file for writing: {file_path}")
-                    downloaded_size = 0
-                    for chunk in response.iter_content(chunk_size=chunk_size):
-                        if chunk:
-                            size = len(chunk)
-                            downloaded_size += size
-                            f.write(chunk)
-                            progress_bar.update(size)
-                
-                progress_bar.close()
-            
-            logger.info(f"Download completed: {file_name} - Size: {downloaded_size} bytes")
+                # Start downloading
+                with client.stream("GET", file_url, headers=headers) as response:
+                    response.raise_for_status()
+
+                    progress_bar = tqdm(
+                        total=total_size,
+                        initial=existing_size,
+                        unit="iB",
+                        unit_scale=True,
+                        desc=file_name,
+                        leave=True,
+                        ncols=100,
+                    )
+
+                    with open(file_path, "ab" if existing_size else "wb") as f:
+                        for chunk in response.iter_bytes(chunk_size=chunk_size):
+                            if chunk:
+                                f.write(chunk)
+                                progress_bar.update(len(chunk))
+
+                    progress_bar.close()
+
+            logger.info(f"Download completed: {file_name} - Size: {os.path.getsize(file_path)} bytes")
             return True, file_name
 
-        except requests.RequestException as e:
-            logger.error(f"Download failed for {file_name}: {str(e)} (Attempt {attempt + 1}/{max_attempts})", 
-                        exc_info=True)
-            if attempt == max_attempts - 1:  # Last attempt
-                return False, file_name
-            logger.info(f"Retrying download for {file_name}...")
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            logger.error(f"Download failed: {e} (Attempt {attempt}/{MAX_ATTEMPTS})")
+
+        if attempt < MAX_ATTEMPTS:
+            logger.info(f"Retrying in {SLEEP_TIME} seconds...")
             time.sleep(SLEEP_TIME)
+        else:
+            return False, file_name
+
+    return False, file_name
 
 def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
     """
