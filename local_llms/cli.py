@@ -83,7 +83,7 @@ def handle_stop(args):
     if not manager.stop():
         sys.exit(1)
     
-def handle_downloaded(args):
+def handle_check(args):
     check_downloaded_model(args.hash, args.output_file)
 
 def main():
@@ -101,7 +101,7 @@ def main():
     elif known_args.command == "download":
         handle_download(known_args)
     elif known_args.command == "check":
-        
+        handle_check(known_args)
     else:
         logger.error(f"Unknown command: {known_args.command}")
         sys.exit(2)
