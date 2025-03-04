@@ -42,7 +42,7 @@ def check_downloaded_model(filecoin_hash: str, output_file: str = None) -> bool:
     data = response.json()
     logger.debug(f"Metadata JSON parsed successfully: {len(data)} keys") 
     model_name = data['model']
-    local_path = os.path.join(str(DEFAULT_OUTPUT_DIR), model_name + POSTFIX_MODEL_PATH)
+    local_path = str(DEFAULT_OUTPUT_DIR/model_name) + POSTFIX_MODEL_PATH
     metadata = {
         "is_downloaded": False,
         "model_path": local_path,
