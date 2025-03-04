@@ -32,7 +32,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int) -
     hash_value = file_info['hash']
     file_url = f"{BASE_URL}{hash_value}"
     file_path = model_dir / file_name
-    max_attempts = 2  # Original attempt + 1 retry
+    max_attempts = 2 
 
     for attempt in range(max_attempts):
         # Remove existing file before each attempt if it exists
@@ -81,7 +81,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int) -
             if attempt == max_attempts - 1:  # Last attempt
                 return False, file_name
             logger.info(f"Retrying download for {file_name}...")
-            time.sleep(SLEEP_TIME)  # Small delay before retry
+            time.sleep(SLEEP_TIME)
 
 def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
     """
