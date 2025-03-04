@@ -73,7 +73,7 @@ def version_command():
     )
 
 def handle_download(args):
-    download_and_extract_model(args.filecoin_hash, args.max_workers, args.chunk_size, args.output_dir)
+    download_and_extract_model(args.hash, args.max_workers, args.chunk_size, args.output_dir)
 
 def handle_start(args):
     if not manager.start(args.hash, args.port, args.host):
