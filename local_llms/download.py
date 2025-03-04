@@ -117,7 +117,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
 
     return False, file_name
 
-def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
+def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = None, chunk_size: int = 1024, output_dir: Path = None) -> None:
     """
     Download and extract model files from IPFS link in parallel with detailed logging.
     
@@ -125,10 +125,11 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         input_link: IPFS gateway URL containing model metadata
         max_workers: Maximum number of parallel downloads
     """
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
     input_link = os.path.join(BASE_URL, filecoin_hash)
     logger = setup_logging()
     model_dir = None
-    
     try:
         logger.info(f"Initiating download process for: {input_link}")
         
