@@ -52,7 +52,7 @@ def parse_args():
         help="Chunk size for downloading files"
     )
     download_command.add_argument(
-        "--output-dir", type=Path,
+        "--output-dir", type=Path, default = None,
         help="Output directory for model files"
     )
     check_command = subparsers.add_parser(
