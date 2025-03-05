@@ -84,6 +84,7 @@ def handle_stop(args):
 def handle_check(args):
     is_downloaded = check_downloaded_model(args.hash)
     res = "True" if is_downloaded else "False"
+    print(res)
     return res
 
 def main():
