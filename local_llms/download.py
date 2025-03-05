@@ -137,14 +137,11 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
     output_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(__name__)
     temp_dir = None
-    
-    # Check if model is already downloaded
-    metadata_path = output_dir / ".metadata.json"
-    if check_downloaded_model(filecoin_hash, metadata_path):
-        with open(metadata_path) as f:
-            metadata = json.load(f)
-            return Path(metadata["model_path"])
-    
+    local_path = output_dir / f"{filecoin_hash}{POSTFIX_MODEL_PATH}"
+    if local_path.exists():
+        logger.info(f"Model already exists at: {local_path}")
+        return local_path
+        
     try:
         # Fetch metadata
         input_link = f"{BASE_URL}{filecoin_hash}"
@@ -156,7 +153,6 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
 
         # Setup paths and prepare directories
         model_name = data['model']
-        local_path = output_dir / f"{filecoin_hash}{POSTFIX_MODEL_PATH}"
         temp_dir = Path(model_name)
         temp_dir.mkdir(exist_ok=True)
         
