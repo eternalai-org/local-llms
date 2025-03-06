@@ -94,8 +94,6 @@ def handle_status(args):
     running_model = manager.get_running_model()
     if running_model:
         print(running_model)
-    else:
-        print("No model is running")
 
 def main():
     known_args, unknown_args = parse_args()

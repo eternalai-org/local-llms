@@ -21,12 +21,13 @@ handle_error() {
   exit $exit_code
 }
 
-# Check if Homebrew is installed
-if ! command -v brew &>/dev/null; then
-  handle_error 1 "Homebrew is not installed. Please install Homebrew first."
+
+# Step 1: Check and install Homebrew if not present
+if ! command_exists brew; then
+  export PATH="$HOME/homebrew/bin:$PATH"
 fi
 
-# Step 1: Install or Update Python
+# Step 2: Install or Update Python
 log "Checking existing Python version..."
 python3 --version || log "No Python installation found."
 
@@ -41,7 +42,7 @@ log "Verifying the installed Python version..."
 python3 --version || handle_error $? "Python installation verification failed"
 log "Python setup complete."
 
-# Step 2: Update PATH in .zshrc
+# Step 3: Update PATH in .zshrc
 log "Checking if PATH update is needed in .zshrc..."
 if ! grep -q 'export PATH="/opt/homebrew/bin:\$PATH"' ~/.zshrc; then
   log "Backing up current .zshrc..."
@@ -54,12 +55,12 @@ else
   log "PATH already contains Homebrew bin directory."
 fi
 
-# Step 3: Install pigz
+# Step 4: Install pigz
 log "Installing pigz..."
 brew install pigz || handle_error $? "Failed to install pigz"
 log "pigz installation completed."
 
-# Step 4: Create and activate Python virtual environment
+# Step 5: Create and activate Python virtual environment
 log "Creating virtual environment 'local_llms'..."
 python3 -m venv local_llms || handle_error $? "Failed to create virtual environment"
 
@@ -71,7 +72,7 @@ else
 fi
 log "Virtual environment activated."
 
-# Step 5: Install llama.cpp
+# Step 6: Install llama.cpp
 log "Checking existing llama.cpp installation..."
 if command -v llama-cli &>/dev/null; then
     log "llama.cpp is installed. Checking for updates..."
@@ -88,7 +89,7 @@ hash -r
 llama-cli --version || handle_error $? "llama.cpp verification failed"
 log "llama.cpp setup complete."
 
-# Step 6: Set up local-llms toolkit
+# Step 7: Set up local-llms toolkit
 log "Setting up local-llms toolkit..."
 pip3 uninstall local-llms -y || log "Warning: local-llms was not previously installed"
 pip3 install -q git+https://github.com/eternalai-org/local-llms.git@v1.0.1 || handle_error $? "Failed to install local-llms toolkit"
