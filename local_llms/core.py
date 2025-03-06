@@ -34,16 +34,14 @@ class LocalLLMManager:
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
             local_model_path = download_and_extract_model(hash)
-            running_model = os.path.basename(local_model_path)
             if os.path.exists("running_service.pkl"):
                 with open("running_service.pkl", "rb") as f:
                     service_info = pickle.load(f)
-                    name = service_info.get("name")
-                    if name == running_model:
-                        logger.warning(f"Model '{name}' is already running on port {service_info.get('port')}")
+                    if service_info.get("hash") == hash:
+                        logger.warning(f"Model '{hash}' is already running on port {service_info.get('port')}")
                         return False
                     else:
-                        logger.info(f"Stopping existing model '{name}' running on port {service_info.get('port')}")
+                        logger.info(f"Stopping existing model '{hash}' running on port {service_info.get('port')}")
                         self.stop()
             
             if not os.path.exists(local_model_path):
@@ -64,9 +62,9 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
-            self._dump_running_service(running_model, port, process.pid)
+            self._dump_running_service(hash, port, process.pid)
             logger.info(f"Local LLM service started successfully on port {port} "
-                       f"for model: {running_model}")
+                       f"for model: {hash}")
             return True
             
         except FileNotFoundError:
@@ -79,11 +77,25 @@ class LocalLLMManager:
             logger.error(f"Unexpected error starting LLM service: {str(e)}", exc_info=True)
             return False
         
-    def _dump_running_service(self, name, port, pid):
+    def _dump_running_service(self, hash, port, pid):
         """Dump the running service details to a file."""
-        service_info = {"name": name, "port": port, "pid": pid}
+        service_info = {"hash": hash, "port": port, "pid": pid}
         with open("running_service.pkl", "wb") as f:
             pickle.dump(service_info, f)
+
+    def get_running_model(self) -> Optional[str]:
+        """
+        Get the name of the currently running model.
+        
+        Returns:
+            Optional[str]: Name of the currently running model, or None if no model is running
+        """
+        if not os.path.exists("running_service.pkl"):
+            return None
+        
+        with open("running_service.pkl", "rb") as f:
+            service_info = pickle.load(f)
+            return service_info.get("name")
 
     def stop(self) -> bool:
         """
@@ -102,10 +114,10 @@ class LocalLLMManager:
                 service_info = pickle.load(f)
             
             port = service_info.get("port")
-            name = service_info.get("name")
+            hash = service_info.get("hash")
             pid = service_info.get("pid")
 
-            logger.info(f"Stopping LLM service '{name}' running on port {port} (PID: {pid})...")
+            logger.info(f"Stopping LLM service '{hash}' running on port {port} (PID: {pid})...")
 
             # Terminate process by PID
             if psutil.pid_exists(pid):

@@ -63,6 +63,9 @@ def parse_args():
         "--hash", type=str, required=True,
         help="Model name to check existence"
     )
+    status_command = subparsers.add_parser(
+       "status", help="Check the running model"
+    )
     return parser.parse_known_args()
 
 def version_command():
@@ -87,6 +90,13 @@ def handle_check(args):
     print(res)
     return res
 
+def handle_status(args):
+    running_model = manager.get_running_model()
+    if running_model:
+        print(running_model)
+    else:
+        print("No model is running")
+
 def main():
     known_args, unknown_args = parse_args()
     for arg in unknown_args:
@@ -103,6 +113,8 @@ def main():
         handle_download(known_args)
     elif known_args.command == "check":
         handle_check(known_args)
+    elif known_args.command == "status":
+        handle_status(known_args)
     else:
         logger.error(f"Unknown command: {known_args.command}")
         sys.exit(2)

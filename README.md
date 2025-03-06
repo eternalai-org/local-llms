@@ -1,45 +1,68 @@
-# Local LLMs Toolkit: Easy Deployment of LLMs on Your Local Machine
+# Local LLMs Toolkit
 
-The **Local LLMs Toolkit** is designed to simplify the process of deploying large language models (LLMs) locally on your machine. It includes an easy setup guide and ready-to-use scripts for a streamlined experience.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Setup Instructions
+> Deploy and manage large language models locally with minimal setup.
 
-### MacOS Installation
+## 📋 Table of Contents
 
-To get started, download the setup script and run it:
+- [Overview](#overview)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Contributing](#contributing)
+
+## 🔭 Overview
+
+The **Local LLMs Toolkit** empowers developers to deploy state-of-the-art large language models directly on their machines. Bypass cloud services, maintain privacy, and reduce costs while leveraging powerful AI capabilities.
+
+## ✨ Features
+
+- **Simple Deployment**: Get models running with minimal configuration
+- **Filecoin Integration**: Download models directly from the Filecoin network
+- **Resource Management**: Automatic optimization for your hardware
+- **Easy Monitoring**: Tools to track model status and performance
+
+## 📦 Installation
+
+### MacOS
+
 ```bash
 bash mac.sh
 ```
-### Verify Installation
 
-After installation, you can verify that everything was set up correctly by checking the version of the toolkit:
+### Verification
+
+Confirm successful installation:
+
 ```bash
 source local_llms/bin/activate
 local-llms version
 ```
-If you see the version number output, the installation is successful and you’re ready to start using Local LLMs Toolkit on your machine!
 
-## Usage
+## 🚀 Usage
 
-### Download model from Filecoin
-To download a model from Filecoin, run the following command:
+### Managing Models
+
 ```bash
+# Check if model is available locally
+local-llms check --hash <filecoin_hash>
+
+# Download a model from Filecoin
 local-llms download --hash <filecoin_hash>
-```
 
-### Start a Local LLM
-To start a local LLM, run the following command:
-```bash
+# Start a model
 local-llms start --hash <filecoin_hash>
-```
-Replace `<filecoin_hash>` with the cid of the LLM you want to start. For example:
 
-```bash
+# Example
 local-llms start --hash bafkreiecx5ojce2tceibd74e2koniii3iweavknfnjdfqs6ows2ikoow6m
-```
 
-### Stop a Local LLM
-To stop a local LLM, run the following command:
-```bash
+# Check running models
+local-llms status
+
+# Stop the current model
 local-llms stop
 ```
+
+## 👥 Contributing
+
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
