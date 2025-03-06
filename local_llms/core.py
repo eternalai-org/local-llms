@@ -54,6 +54,7 @@ class LocalLLMManager:
             process = subprocess.Popen(
                 [
                     "nohup", "llama-server",
+                    "--jinja",
                     "--model", local_model_path,
                     "--port", str(port),
                     "--host", host,
