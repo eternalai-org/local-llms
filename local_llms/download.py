@@ -65,11 +65,32 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
     hash_value = file_info["hash"]
     file_url = f"{BASE_URL}{hash_value}"
     file_path = model_dir / file_name
+    hash_cache_path = file_path.with_suffix(file_path.suffix + ".hash")
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             headers = {}
             existing_size = file_path.stat().st_size if file_path.exists() else 0
+
+            # Check cached hash if resuming
+            if existing_size > 0:
+                if hash_cache_path.exists():
+                    with open(hash_cache_path, "r") as hf:
+                        cached_hash = hf.read().strip()
+                    if cached_hash != hash_value:
+                        logger.warning(f"Hash mismatch for {file_name}: cached={cached_hash}, new={hash_value}")
+                        logger.warning("Restarting download from scratch")
+                        existing_size = 0
+                        file_path.unlink(missing_ok=True)
+                else:
+                    # No hash cache found for partial download, restart
+                    logger.warning(f"No hash cache found for partial download of {file_name}, restarting")
+                    existing_size = 0
+                    file_path.unlink(missing_ok=True)
+            
+            # Create/update hash cache file
+            with open(hash_cache_path, "w") as hf:
+                hf.write(hash_value)
 
             with httpx.Client(follow_redirects=True, timeout=60) as client:
                 # Check total file size
@@ -116,12 +137,14 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 return False, file_name
 
             logger.info(f"Download completed: {file_name} - Size: {os.path.getsize(file_path)} bytes")
-            # Skip hash verification since hash_value is an IPFS content identifier, not a file hash
-            # Verify file size instead
+            # Verify file size
             if os.path.getsize(file_path) != total_size:
                 logger.error(f"Size mismatch after download: {file_name}")
                 return False, file_name
                 
+            # Remove hash cache file after successful download
+            hash_cache_path.unlink(missing_ok=True)
+            
             # If we reach here, download was successful
             return True, file_name
             
