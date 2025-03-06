@@ -21,6 +21,9 @@ handle_error() {
   exit $exit_code
 }
 
+command_exists() {
+  command -v "$1" &> /dev/null
+}
 
 # Step 1: Check and install Homebrew if not present
 if ! command_exists brew; then
