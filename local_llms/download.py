@@ -77,22 +77,14 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 response.raise_for_status()
                 total_size = int(response.headers.get("content-length", 0))
 
-                # Validate existing file (optional: if hash of partial content is available)
-                if existing_size and existing_size < total_size:
-                    # For simplicity, we skip partial hash validation here
-                    # In practice, you'd need server support for partial hashes
+                # Check if file is already fully downloaded
+                if existing_size and existing_size == total_size:
+                    logger.info(f"File already fully downloaded: {file_name}")
+                    return True, file_name
+                # Otherwise, resume download if file exists but is incomplete
+                elif existing_size and existing_size < total_size:
                     headers["Range"] = f"bytes={existing_size}-"
                     logger.info(f"Resuming download from {existing_size} bytes")
-                elif existing_size and existing_size == total_size:
-                    # Optionally validate the full file's hash
-                    with open(file_path, "rb") as f:
-                        file_hash = hashlib.sha256(f.read()).hexdigest()
-                    if file_hash == hash_value:
-                        logger.info(f"File already fully downloaded and verified: {file_name}")
-                        return True, file_name
-                    else:
-                        logger.warning(f"File exists but hash mismatch. Restarting download.")
-                        existing_size = 0  # Reset to restart download
 
                 # Start downloading
                 with client.stream("GET", file_url, headers=headers) as response:
@@ -124,16 +116,20 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 return False, file_name
 
             logger.info(f"Download completed: {file_name} - Size: {os.path.getsize(file_path)} bytes")
+            # Skip hash verification since hash_value is an IPFS content identifier, not a file hash
+            # Verify file size instead
+            if os.path.getsize(file_path) != total_size:
+                logger.error(f"Size mismatch after download: {file_name}")
+                return False, file_name
+                
+            # If we reach here, download was successful
             return True, file_name
-
-        except (httpx.RequestError, httpx.TimeoutException) as e:
-            logger.error(f"Download failed: {e} (Attempt {attempt}/{MAX_ATTEMPTS})")
-
-        if attempt < MAX_ATTEMPTS:
-            logger.info(f"Retrying in {SLEEP_TIME} seconds...")
-            time.sleep(SLEEP_TIME)
-        else:
-            return False, file_name
+            
+        except Exception as e:
+            logger.error(f"Download attempt {attempt}/{MAX_ATTEMPTS} failed: {e}")
+            if attempt < MAX_ATTEMPTS:
+                logger.info(f"Retrying in {SLEEP_TIME} seconds...")
+                time.sleep(SLEEP_TIME)
 
     return False, file_name
 
