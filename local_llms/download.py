@@ -159,7 +159,9 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
     if local_path.exists():
         logger.info(f"Model already exists at: {local_path}")
         return local_path
-        
+    
+    interrupted = False
+    connection_lost = False
     try:
         # Fetch metadata
         input_link = f"{BASE_URL}{filecoin_hash}"
@@ -218,16 +220,26 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         logger.info(f"Model successfully downloaded to {local_path}")
         return local_path
 
+    except KeyboardInterrupt:
+        interrupted = True
+        logger.warning("Download interrupted by user. Partial files are preserved.")
+        return None
     except requests.RequestException as e:
-        logger.error(f"Network error: {e}")
+        connection_lost = True
+        logger.error(f"Network error: {e}. Partial files are preserved.")
+    except (httpx.RequestError, httpx.TimeoutException) as e:
+        connection_lost = True
+        logger.error(f"Connection lost: {e}. Partial files are preserved.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Extraction failed: {e.stderr}")
     except Exception as e:
         logger.error(f"Error: {e}")
     finally:
-        # Ensure cleanup even if errors occurred
-        if temp_dir and temp_dir.exists():
+        # Only clean up if not interrupted by user and connection wasn't lost
+        if temp_dir and temp_dir.exists() and not (interrupted or connection_lost):
             shutil.rmtree(temp_dir, ignore_errors=True)
             logger.debug(f"Temporary directory {temp_dir} removed")
+        elif (interrupted or connection_lost) and temp_dir and temp_dir.exists():
+            logger.info(f"Temporary directory {temp_dir} preserved for resumable download")
     
     return None
