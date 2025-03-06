@@ -45,11 +45,11 @@ def parse_args():
         help="IPFS hash of the model metadata"
     )
     download_command.add_argument(
-        "--max-workers", type=int, default=8,
+        "--max-workers", type=int, default=2,
         help="Maximum number of parallel downloads"
     )
     download_command.add_argument(
-        "--chunk-size", type=int, default=1024,
+        "--chunk-size", type=int, default=8192,
         help="Chunk size for downloading files"
     )
     download_command.add_argument(

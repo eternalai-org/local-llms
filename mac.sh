@@ -34,10 +34,11 @@ fi
 log "Checking existing Python version..."
 python3 --version || log "No Python installation found."
 
-if brew list python &>/dev/null; then
-  log "Upgrading Python..."
-  brew upgrade python || handle_error $? "Failed to upgrade Python"
+log "Checking system Python..."
+if command_exists python3; then
+  log "Python is already installed on the system. Skipping Python installation."
 else
+  log "No Python found. Installing Python using Homebrew..."
   brew install python || handle_error $? "Failed to install Python"
 fi
 

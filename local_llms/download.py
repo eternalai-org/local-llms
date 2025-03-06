@@ -10,14 +10,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 import httpx
-import json
+import hashlib
 
 # Constants
 BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "llms-storage"
 SLEEP_TIME = 5
 MAX_ATTEMPTS = 3
-CHUNK_SIZE = 16384
+CHUNK_SIZE = 8192
 POSTFIX_MODEL_PATH = ".gguf"
 
 
@@ -58,7 +58,6 @@ def check_downloaded_model(filecoin_hash: str) -> bool:
         logger.error(f"Failed to fetch model metadata: {e}")
         return False
 
-
 def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = CHUNK_SIZE) -> Tuple[bool, str]:
     """Download a file with resume support using HTTPX."""
     logger = logging.getLogger(__name__)
@@ -78,10 +77,22 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 response.raise_for_status()
                 total_size = int(response.headers.get("content-length", 0))
 
-                # Resume download if possible
+                # Validate existing file (optional: if hash of partial content is available)
                 if existing_size and existing_size < total_size:
+                    # For simplicity, we skip partial hash validation here
+                    # In practice, you'd need server support for partial hashes
                     headers["Range"] = f"bytes={existing_size}-"
                     logger.info(f"Resuming download from {existing_size} bytes")
+                elif existing_size and existing_size == total_size:
+                    # Optionally validate the full file's hash
+                    with open(file_path, "rb") as f:
+                        file_hash = hashlib.sha256(f.read()).hexdigest()
+                    if file_hash == hash_value:
+                        logger.info(f"File already fully downloaded and verified: {file_name}")
+                        return True, file_name
+                    else:
+                        logger.warning(f"File exists but hash mismatch. Restarting download.")
+                        existing_size = 0  # Reset to restart download
 
                 # Start downloading
                 with client.stream("GET", file_url, headers=headers) as response:
@@ -104,6 +115,13 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                                 progress_bar.update(len(chunk))
 
                     progress_bar.close()
+
+            # Verify full file hash after download
+            with open(file_path, "rb") as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()
+            if file_hash != hash_value:
+                logger.error(f"Hash mismatch after download: {file_name}")
+                return False, file_name
 
             logger.info(f"Download completed: {file_name} - Size: {os.path.getsize(file_path)} bytes")
             return True, file_name
