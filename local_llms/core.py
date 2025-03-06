@@ -96,7 +96,7 @@ class LocalLLMManager:
         
         with open("running_service.pkl", "rb") as f:
             service_info = pickle.load(f)
-            return service_info.get("name")
+            return service_info.get("hash")
 
     def stop(self) -> bool:
         """
