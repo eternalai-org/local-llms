@@ -96,7 +96,7 @@ log "llama.cpp setup complete."
 # Step 7: Set up local-llms toolkit
 log "Setting up local-llms toolkit..."
 pip3 uninstall local-llms -y || log "Warning: local-llms was not previously installed"
-pip3 install -q git+https://github.com/eternalai-org/local-llms.git@v1.0.2 || handle_error $? "Failed to install local-llms toolkit"
+pip3 install -q git+https://github.com/eternalai-org/local-llms.git@v1.0.3 || handle_error $? "Failed to install local-llms toolkit"
 log "local-llms toolkit setup completed."
 
 log "All steps completed successfully."
