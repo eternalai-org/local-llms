@@ -108,6 +108,7 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 if existing_size and existing_size == total_size:
                     logger.info(f"File already fully downloaded: {file_name}")
                     resume_info_path.unlink(missing_ok=True)  # Remove resume file
+                    hash_cache_path.unlink(missing_ok=True)  # Clean up hash cache
                     return True, file_name
                 # Otherwise, resume download if file exists but is incomplete
                 elif existing_size and existing_size < total_size:
@@ -117,6 +118,15 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 # Start downloading with connection retry logic
                 with client.stream("GET", file_url, headers=headers) as response:
                     response.raise_for_status()
+                    
+                    # When resuming, content-length will be the remaining size, not total size
+                    remaining_size = int(response.headers.get("content-length", 0))
+                    current_total = existing_size + remaining_size
+                    
+                    # Sanity check to prevent overwriting
+                    if current_total > total_size:
+                        logger.warning(f"Server reported more data than expected for {file_name}, using original total")
+                        current_total = total_size
 
                     progress_bar = tqdm(
                         total=total_size,
@@ -131,21 +141,36 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                     with open(file_path, "ab" if existing_size else "wb") as f:
                         downloaded_since_last_save = 0
                         save_threshold = 10 * 1024 * 1024  # Save resume info every 10MB
+                        current_size = existing_size
                         
                         for chunk in response.iter_bytes(chunk_size=chunk_size):
-                            if chunk:
+                            if not chunk:
+                                continue
+                                
+                            # Don't write more than expected
+                            if current_size + len(chunk) > total_size:
+                                truncated = chunk[:total_size - current_size]
+                                f.write(truncated)
+                                current_size += len(truncated)
+                                progress_bar.update(len(truncated))
+                                break
+                            else:
                                 f.write(chunk)
-                                current_size = existing_size + progress_bar.n + len(chunk)
+                                current_size += len(chunk)
                                 progress_bar.update(len(chunk))
                                 downloaded_since_last_save += len(chunk)
                                 
-                                # Update resume file periodically to ensure latest position is saved
-                                if downloaded_since_last_save >= save_threshold:
-                                    with open(resume_info_path, "w") as rf:
-                                        rf.write(f"{file_url}\n{current_size}\n{hash_value}")
-                                    downloaded_since_last_save = 0
+                            # Update resume file periodically
+                            if downloaded_since_last_save >= save_threshold:
+                                with open(resume_info_path, "w") as rf:
+                                    rf.write(f"{file_url}\n{current_size}\n{hash_value}")
+                                downloaded_since_last_save = 0
 
                     progress_bar.close()
+                    
+                    # Final check to ensure we're at expected size
+                    if current_size != total_size:
+                        logger.warning(f"Download size mismatch: got {current_size}, expected {total_size}")
 
             # Verify full file hash after download
             logger.info(f"Verifying file integrity for: {file_name}")
