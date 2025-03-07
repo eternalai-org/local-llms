@@ -59,13 +59,14 @@ def check_downloaded_model(filecoin_hash: str) -> bool:
         return False
 
 def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = CHUNK_SIZE) -> Tuple[bool, str]:
-    """Download a file with resume support using HTTPX."""
+    """Download a file with enhanced resume support using HTTPX."""
     logger = logging.getLogger(__name__)
     file_name = file_info["file"]
     hash_value = file_info["hash"]
     file_url = f"{BASE_URL}{hash_value}"
     file_path = model_dir / file_name
     hash_cache_path = file_path.with_suffix(file_path.suffix + ".hash")
+    resume_info_path = file_path.with_suffix(file_path.suffix + ".resume")
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
@@ -92,7 +93,12 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
             with open(hash_cache_path, "w") as hf:
                 hf.write(hash_value)
 
-            with httpx.Client(follow_redirects=True, timeout=60) as client:
+            # Save resume info for potential reconnection attempts
+            with open(resume_info_path, "w") as rf:
+                rf.write(f"{file_url}\n{existing_size}\n{hash_value}")
+
+            # Use a longer timeout for unstable connections
+            with httpx.Client(follow_redirects=True, timeout=120.0) as client:
                 # Check total file size
                 response = client.head(file_url)
                 response.raise_for_status()
@@ -101,13 +107,14 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 # Check if file is already fully downloaded
                 if existing_size and existing_size == total_size:
                     logger.info(f"File already fully downloaded: {file_name}")
+                    resume_info_path.unlink(missing_ok=True)  # Remove resume file
                     return True, file_name
                 # Otherwise, resume download if file exists but is incomplete
                 elif existing_size and existing_size < total_size:
                     headers["Range"] = f"bytes={existing_size}-"
-                    logger.info(f"Resuming download from {existing_size} bytes")
+                    logger.info(f"Resuming download from {existing_size}/{total_size} bytes ({existing_size/total_size*100:.1f}%)")
 
-                # Start downloading
+                # Start downloading with connection retry logic
                 with client.stream("GET", file_url, headers=headers) as response:
                     response.raise_for_status()
 
@@ -122,14 +129,26 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                     )
 
                     with open(file_path, "ab" if existing_size else "wb") as f:
+                        downloaded_since_last_save = 0
+                        save_threshold = 10 * 1024 * 1024  # Save resume info every 10MB
+                        
                         for chunk in response.iter_bytes(chunk_size=chunk_size):
                             if chunk:
                                 f.write(chunk)
+                                current_size = existing_size + progress_bar.n + len(chunk)
                                 progress_bar.update(len(chunk))
+                                downloaded_since_last_save += len(chunk)
+                                
+                                # Update resume file periodically to ensure latest position is saved
+                                if downloaded_since_last_save >= save_threshold:
+                                    with open(resume_info_path, "w") as rf:
+                                        rf.write(f"{file_url}\n{current_size}\n{hash_value}")
+                                    downloaded_since_last_save = 0
 
                     progress_bar.close()
 
             # Verify full file hash after download
+            logger.info(f"Verifying file integrity for: {file_name}")
             with open(file_path, "rb") as f:
                 file_hash = hashlib.sha256(f.read()).hexdigest()
             if file_hash != hash_value:
@@ -142,12 +161,20 @@ def download_file(file_info: Dict[str, str], model_dir: Path, chunk_size: int = 
                 logger.error(f"Size mismatch after download: {file_name}")
                 return False, file_name
                 
-            # Remove hash cache file after successful download
+            # Remove hash cache and resume files after successful download
             hash_cache_path.unlink(missing_ok=True)
+            resume_info_path.unlink(missing_ok=True)
             
             # If we reach here, download was successful
             return True, file_name
             
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            logger.error(f"Connection error on attempt {attempt}/{MAX_ATTEMPTS}: {e}")
+            if attempt < MAX_ATTEMPTS:
+                # Exponential backoff
+                wait_time = SLEEP_TIME * (2 ** (attempt - 1))
+                logger.info(f"Network unstable. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
         except Exception as e:
             logger.error(f"Download attempt {attempt}/{MAX_ATTEMPTS} failed: {e}")
             if attempt < MAX_ATTEMPTS:
@@ -175,8 +202,13 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
     logger = logging.getLogger(__name__)
     temp_dir = None
     local_path = output_dir / f"{filecoin_hash}{POSTFIX_MODEL_PATH}"
+    
+    # Track downloads state for resuming
+    resume_state_file = output_dir / f"{filecoin_hash}.resume_state"
+    
     if local_path.exists():
         logger.info(f"Model already exists at: {local_path}")
+        resume_state_file.unlink(missing_ok=True)  # Clean up resume state if exists
         return local_path
     
     interrupted = False
@@ -194,6 +226,10 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         model_name = data['model']
         temp_dir = Path(model_name)
         temp_dir.mkdir(exist_ok=True)
+        
+        # Save model metadata for resume capability
+        with open(resume_state_file, "w") as f:
+            f.write(f"{filecoin_hash}\n{model_name}\n{data['num_of_file']}")
         
         num_files = data['num_of_file']
         logger.info(f"Downloading {model_name}: {num_files} files")
@@ -235,20 +271,24 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         
         # Cleanup temp directories
         shutil.rmtree(output_dir / model_name, ignore_errors=True)
+        resume_state_file.unlink(missing_ok=True)  # Clean up resume state
         
         logger.info(f"Model successfully downloaded to {local_path}")
         return local_path
 
     except KeyboardInterrupt:
         interrupted = True
-        logger.warning("Download interrupted by user. Partial files are preserved.")
+        logger.warning("Download interrupted by user. Partial files are preserved for resuming.")
+        logger.info(f"Run the same command again to resume download.")
         return None
     except requests.RequestException as e:
         connection_lost = True
-        logger.error(f"Network error: {e}. Partial files are preserved.")
+        logger.error(f"Network error: {e}. Partial files are preserved for resuming.")
+        logger.info(f"Run the same command again to resume download.")
     except (httpx.RequestError, httpx.TimeoutException) as e:
         connection_lost = True
-        logger.error(f"Connection lost: {e}. Partial files are preserved.")
+        logger.error(f"Connection lost: {e}. Partial files are preserved for resuming.")
+        logger.info(f"Run the same command again to resume download.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Extraction failed: {e.stderr}")
     except Exception as e:
