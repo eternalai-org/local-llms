@@ -32,7 +32,7 @@ def parse_args():
         help="Host address for the local language model server"
     )
     start_command.add_argument(
-        "--context-length", type=int, default=4096
+        "--context-length", type=int, default=4096,
         help="Context length for the local language model server"
     )
     stop_command = subparsers.add_parser(
