@@ -200,7 +200,7 @@ def download_and_extract_model(filecoin_hash: str, max_workers: Optional[int] = 
         logger.error(f"Error: {e}")
     finally:
         # Ensure cleanup even if errors occurred
-        if temp_dir and temp_dir.exists():
+        if temp_dir and temp_dir.exists() and local_path.exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
             logger.debug(f"Temporary directory {temp_dir} removed")
     
