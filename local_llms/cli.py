@@ -31,6 +31,10 @@ def parse_args():
         "--host", type=str, default="0.0.0.0",
         help="Host address for the local language model server"
     )
+    start_command.add_argument(
+        "--context-length", type=int, default=4096
+        help="Context length for the local language model server"
+    )
     stop_command = subparsers.add_parser(
         "stop", help="Stop a local language model server"
     )
@@ -77,7 +81,7 @@ def handle_download(args):
     download_and_extract_model(args.hash, args.max_workers, args.chunk_size, args.output_dir)
 
 def handle_start(args):
-    if not manager.start(args.hash, args.port, args.host):
+    if not manager.start(args.hash, args.port, args.host, args.context_length):
         sys.exit(1)
 
 def handle_stop(args):

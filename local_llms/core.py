@@ -14,7 +14,7 @@ class LocalLLMManager:
         """Initialize the LocalLLMManager."""       
         self.pickle_file = Path.cwd()/ "running_service.pkl"
 
-    def start(self, hash: str, port: int = 8080, host: str = "0.0.0.0") -> bool:
+    def start(self, hash: str, port: int = 8080, host: str = "0.0.0.0", context_length: int = 4096) -> bool:
         """
         Start the local LLM service in the background.
         
@@ -58,6 +58,7 @@ class LocalLLMManager:
                     "--model", local_model_path,
                     "--port", str(port),
                     "--host", host,
+                    "-c", str(context_length)
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
