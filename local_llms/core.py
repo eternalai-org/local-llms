@@ -39,7 +39,7 @@ class LocalLLMManager:
                     service_info = pickle.load(f)
                     if service_info.get("hash") == hash:
                         logger.warning(f"Model '{hash}' is already running on port {service_info.get('port')}")
-                        return False
+                        return True
                     else:
                         logger.info(f"Stopping existing model '{hash}' running on port {service_info.get('port')}")
                         self.stop()
