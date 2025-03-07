@@ -49,7 +49,7 @@ def parse_args():
         help="IPFS hash of the model metadata"
     )
     download_command.add_argument(
-        "--max-workers", type=int, default=2,
+        "--max-workers", type=int, default=1,
         help="Maximum number of parallel downloads"
     )
     download_command.add_argument(
