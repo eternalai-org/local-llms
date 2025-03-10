@@ -133,11 +133,12 @@ def download_and_extract_model(filecoin_hash: str, chunk_size: int = CHUNK_SIZE,
         logger.info(f"Downloading {model_name}: {num_files} files")
 
         successful_downloads = 0
+        print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
         for idx, file_info in enumerate(data['files']):
             success, file_name = download_file(file_info, temp_dir, client, chunk_size)
             if success:
-                logger.info(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {idx + 1}-{num_files} --hash {filecoin_hash}")
                 successful_downloads += 1
+                print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
             else:
                 logger.error(f"Download failed --step {idx + 1}-{num_files} --hash {filecoin_hash}")
 
