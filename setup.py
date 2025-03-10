@@ -10,7 +10,8 @@ setup(
         "tqdm",
         "loguru",
         "psutil",
-        "httpx"
+        "httpx",
+        "loguru"
     ],
     entry_points={
         "console_scripts": [

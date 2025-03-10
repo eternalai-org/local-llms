@@ -49,10 +49,6 @@ def parse_args():
         help="IPFS hash of the model metadata"
     )
     download_command.add_argument(
-        "--max-workers", type=int, default=1,
-        help="Maximum number of parallel downloads"
-    )
-    download_command.add_argument(
         "--chunk-size", type=int, default=8192,
         help="Chunk size for downloading files"
     )
@@ -78,7 +74,7 @@ def version_command():
     )
 
 def handle_download(args):
-    download_and_extract_model(args.hash, args.max_workers, args.chunk_size, args.output_dir)
+    download_and_extract_model(args.hash, args.chunk_size, args.output_dir)
 
 def handle_start(args):
     if not manager.start(args.hash, args.port, args.host, args.context_length):
