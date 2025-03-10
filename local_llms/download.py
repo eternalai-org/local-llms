@@ -11,7 +11,7 @@ from typing import Dict, Tuple, Optional
 import httpx
 
 # Constants
-BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
+BASE_URL = "http://gateway.mesh3.network/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "llms-storage"
 SLEEP_TIME = 10
 MAX_ATTEMPTS = 5
