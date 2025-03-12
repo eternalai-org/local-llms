@@ -58,7 +58,8 @@ class LocalLLMManager:
                     "--model", local_model_path,
                     "--port", str(port),
                     "--host", host,
-                    "-c", str(context_length)
+                    "-c", str(context_length),
+                    "--pooling", "cls"
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

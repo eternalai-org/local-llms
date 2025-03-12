@@ -11,12 +11,13 @@ from typing import Dict, Tuple, Optional
 import httpx
 
 # Constants
-BASE_URL = "http://gateway.mesh3.network/ipfs/"
+BASE_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "llms-storage"
-SLEEP_TIME = 10
-MAX_ATTEMPTS = 5
-CHUNK_SIZE = 8192
+SLEEP_TIME = 60
+MAX_ATTEMPTS = 10
+CHUNK_SIZE = 1024
 POSTFIX_MODEL_PATH = ".gguf"
+HTTPX_TIMEOUT = 100
 
 def check_downloaded_model(filecoin_hash: str) -> bool:
     """
@@ -60,7 +61,6 @@ def download_file(file_info: Dict[str, str], model_dir: Path, client: httpx.Clie
             mode = "ab" if file_size > 0 else "wb"
 
             with client.stream("GET", file_url, headers=headers) as response:
-                response.raise_for_status()
 
                 total_size = int(response.headers.get("content-length", 0))
                 if file_size == total_size and file_size > 0:
@@ -111,40 +111,38 @@ def download_and_extract_model(filecoin_hash: str, chunk_size: int = CHUNK_SIZE,
 
     input_link = f"{BASE_URL}{filecoin_hash}"
     logger.info(f"Fetching model metadata from: {input_link}")
-
-    with httpx.Client(follow_redirects=True, timeout=60) as client:
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            try:
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            with httpx.Client(follow_redirects=True, timeout=HTTPX_TIMEOUT) as client:
                 response = client.get(input_link)
-                response.raise_for_status()
                 data = response.json()
-                break
-            except httpx.RequestError as e:
+
+                model_name = data['model']
+                temp_dir = Path(model_name)
+                temp_dir.mkdir(exist_ok=True)
+
+                num_files = data['num_of_file']
+                logger.info(f"Downloading {model_name}: {num_files} files")
+
+                successful_downloads = 0
+                print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
+                for idx, file_info in enumerate(data['files']):
+                    success, file_name = download_file(file_info, temp_dir, client, chunk_size)
+                    if success:
+                        successful_downloads += 1
+                        print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
+                    else:
+                        logger.error(f"Download failed --step {idx + 1}-{num_files} --hash {filecoin_hash}")
+                        
+
+                if successful_downloads != num_files:
+                    logger.error(f"Failed to download all files: {successful_downloads}/{num_files}")    
+                else:
+                    break                
+                
+        except httpx.RequestError as e:
                 logger.error(f"Failed to fetch model metadata: {e} (Attempt {attempt}/{MAX_ATTEMPTS})")
                 time.sleep(SLEEP_TIME)
-        else:
-            return None
-
-        model_name = data['model']
-        temp_dir = Path(model_name)
-        temp_dir.mkdir(exist_ok=True)
-
-        num_files = data['num_of_file']
-        logger.info(f"Downloading {model_name}: {num_files} files")
-
-        successful_downloads = 0
-        print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
-        for idx, file_info in enumerate(data['files']):
-            success, file_name = download_file(file_info, temp_dir, client, chunk_size)
-            if success:
-                successful_downloads += 1
-                print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {successful_downloads}-{num_files} --hash {filecoin_hash}")
-            else:
-                logger.error(f"Download failed --step {idx + 1}-{num_files} --hash {filecoin_hash}")
-
-        if successful_downloads != num_files:
-            raise RuntimeError(f"Incomplete download: {successful_downloads}/{num_files} files")
-
     try:
         logger.info("Extracting model files...")
         extract_cmd = (
