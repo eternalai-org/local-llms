@@ -1,6 +1,5 @@
 import sys
 import argparse
-import subprocess
 from pathlib import Path
 from loguru import logger
 from local_llms import __version__
