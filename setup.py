@@ -11,7 +11,9 @@ setup(
         "loguru",
         "psutil",
         "httpx",
-        "loguru"
+        "loguru",
+        "lighthouseweb3",
+        "python-dotenv"
     ],
     entry_points={
         "console_scripts": [

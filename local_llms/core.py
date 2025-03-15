@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from loguru import logger
 from typing import Optional
-from local_llms.download import download_and_extract_model
+from local_llms.download import download_model_from_filecoin
 
 class LocalLLMManager:
     """Manages a local Large Language Model (LLM) service."""
@@ -33,7 +33,7 @@ class LocalLLMManager:
          
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
-            local_model_path = download_and_extract_model(hash)
+            local_model_path = download_model_from_filecoin(hash)
             if os.path.exists("running_service.pkl"):
                 with open("running_service.pkl", "rb") as f:
                     service_info = pickle.load(f)

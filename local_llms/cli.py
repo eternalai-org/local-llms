@@ -4,7 +4,8 @@ from pathlib import Path
 from loguru import logger
 from local_llms import __version__
 from local_llms.core import LocalLLMManager
-from local_llms.download import check_downloaded_model, download_and_extract_model
+from local_llms.upload import upload_folder_to_lighthouse
+from local_llms.download import check_downloaded_model, download_model_from_filecoin
 
 manager = LocalLLMManager()
 
@@ -55,6 +56,42 @@ def parse_args():
         "--output-dir", type=Path, default = None,
         help="Output directory for model files"
     )
+    upload_command = subparsers.add_parser(
+        "upload", help="Upload model files to IPFS"
+    )
+    upload_command.add_argument(
+        "--folder", type=Path, required=True,
+        help="Folder containing model files"
+    )
+    upload_command.add_argument(
+        "--task", type=str, required=True,
+        help = "Task for the model llms",
+        choices = ["text-generation", "multimodal"]
+    )   
+    upload_command.add_argument(
+        "--zip-chunk-size", type=int, default=512,
+        help="Chunk size for splitting compressed files"
+    )
+    upload_command.add_argument(
+        "--threads", type=int, default=16,
+        help="Number of threads for compressing files"
+    )
+    upload_command.add_argument(
+        "--max-retries", type=int, default=20,
+        help="Maximum number of retries for uploading files"
+    )
+    upload_command.add_argument(
+        "--hf-repo", type=str, default = None,
+        help="Hugging Face model repository"
+    )
+    upload_command.add_argument(
+        "--hf-file", type=str, default = None,
+        help="Hugging Face model file"
+    )
+    upload_command.add_argument(
+        "--ram", type=int, default=None,
+        help="RAM in GB for the serving model at 4096 context length"
+    )
     check_command = subparsers.add_parser(
         "check", help="Model metadata check"
     )
@@ -73,7 +110,7 @@ def version_command():
     )
 
 def handle_download(args):
-    download_and_extract_model(args.hash, args.chunk_size, args.output_dir)
+    download_model_from_filecoin(args.hash)
 
 def handle_start(args):
     if not manager.start(args.hash, args.port, args.host, args.context_length):
@@ -94,6 +131,15 @@ def handle_status(args):
     if running_model:
         print(running_model)
 
+def handle_upload(args):
+    kwargs = {
+        "task": args.task,
+        "ram": args.ram,
+        "hf_repo": args.hf_repo,
+        "hf_file": args.hf_file,
+    }
+    upload_folder_to_lighthouse(args.folder, args.zip_chunk_size, args.max_retries, args.threads, **kwargs)
+
 def main():
     known_args, unknown_args = parse_args()
     for arg in unknown_args:
@@ -112,6 +158,8 @@ def main():
         handle_check(known_args)
     elif known_args.command == "status":
         handle_status(known_args)
+    elif known_args.command == "upload":
+        handle_upload(known_args)
     else:
         logger.error(f"Unknown command: {known_args.command}")
         sys.exit(2)
