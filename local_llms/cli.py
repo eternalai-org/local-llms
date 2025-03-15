@@ -60,7 +60,7 @@ def parse_args():
         "upload", help="Upload model files to IPFS"
     )
     upload_command.add_argument(
-        "--folder", type=Path, required=True,
+        "--folder-name", type=str, required=True,
         help="Folder containing model files"
     )
     upload_command.add_argument(
@@ -138,7 +138,7 @@ def handle_upload(args):
         "hf_repo": args.hf_repo,
         "hf_file": args.hf_file,
     }
-    upload_folder_to_lighthouse(args.folder, args.zip_chunk_size, args.max_retries, args.threads, **kwargs)
+    upload_folder_to_lighthouse(args.folder_name, args.zip_chunk_size, args.max_retries, args.threads, **kwargs)
 
 def main():
     known_args, unknown_args = parse_args()
