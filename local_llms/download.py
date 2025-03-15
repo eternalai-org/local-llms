@@ -165,14 +165,14 @@ def download_files_from_lighthouse(data: dict) -> bool:
     assert len(result_paths) == num_of_files, f"Failed to download all files: {len(result_paths)} out of {num_of_files}"
     return folder_path
 
-def extract_zip(folder_name: str, output_dir: Path):
+def extract_zip(folder_name: str):
     extract_command = (
         f"cat '{folder_name}/{folder_name}'.zip.part-* | "
         f"pigz -p {os.cpu_count()} -d | "
-        f"tar -xf - -C '{output_dir}'"
+        f"tar -xf - -C ." 
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
-    print(f"Extracted files to {output_dir}")
+    print(f"Extracted files to {folder_name}")
 
 
 def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_OUTPUT_DIR):
@@ -216,8 +216,8 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 
                 try:
                     print("Extracting downloaded files")
-                    extract_zip(folder_name, output_dir)          
-                    source_path = output_dir / folder_name / folder_name
+                    extract_zip(folder_name)      
+                    source_path = folder_path / folder_name
                     print(f"Moving model to {local_path}")
                     shutil.move(source_path, local_path)                    
                     if folder_path.exists():
