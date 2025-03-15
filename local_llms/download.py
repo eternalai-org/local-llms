@@ -216,16 +216,12 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 
                 try:
                     print("Extracting downloaded files")
-                    extract_zip(folder_name, output_dir)
-                    
+                    extract_zip(folder_name, output_dir)          
                     source_path = output_dir / folder_name / folder_name
                     print(f"Moving model to {local_path}")
-                    shutil.move(source_path, local_path)
-                    shutil.rmtree(output_dir / folder_name)
-                    
+                    shutil.move(source_path, local_path)                    
                     if folder_path.exists():
                         shutil.rmtree(folder_path)
-                    
                     print(f"Model download complete: {local_path}")
                     return local_path
                     
@@ -241,10 +237,6 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 backoff = min(SLEEP_TIME * (2 ** (attempt - 1)), 300)  # Exponential backoff capped at 5 min
                 print(f"Retrying in {backoff} seconds")
                 time.sleep(backoff)
-    
-    # Clean up any leftover folder_path if download failed
-    if folder_path and folder_path.exists():
-        shutil.rmtree(folder_path)
     
     print("All download attempts failed")
     return None
