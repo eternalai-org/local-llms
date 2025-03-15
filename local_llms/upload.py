@@ -73,22 +73,22 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
         raise RuntimeError(f"Compression failed: {e}")
 
 def upload_folder_to_lighthouse(
-    folder_path: Path, zip_chunk_size=512, max_retries=20, threads=16, max_workers=4, **kwargs
+    folder_name: str, zip_chunk_size=512, max_retries=20, threads=16, max_workers=4, **kwargs
 ):
     """
     Upload a folder to Lighthouse.storage by compressing it into parts and uploading in parallel.
     """
+    folder_path = Path(folder_name)
     if not os.path.exists(folder_path):
         raise FileNotFoundError(f"Folder not found: {folder_path}")
     
-    model_folder = os.path.basename(folder_path)
     metadata = {
-        "folder_name": model_folder,
+        "folder_name": folder_name,
         "chunk_size_mb": zip_chunk_size,
         "files": [],
         **kwargs,
     }
-    metadata_path = Path.cwd() / f"{model_folder}.json"
+    metadata_path = Path.cwd() / f"{folder_name}.json"
     temp_dir = None
 
     try:
@@ -96,7 +96,7 @@ def upload_folder_to_lighthouse(
         temp_dir = compress_folder(folder_path, zip_chunk_size, threads)
         part_files = [
             os.path.join(temp_dir, f) for f in sorted(os.listdir(temp_dir))
-            if f.startswith(f"{model_folder}.zip.part-")
+            if f.startswith(f"{folder_name}.zip.part-")
         ]
         metadata["num_of_files"] = len(part_files)
         print(f"Uploading {len(part_files)} parts to Lighthouse.storage...")
