@@ -167,7 +167,10 @@ def download_files_from_lighthouse(data: dict) -> bool:
     return result_paths
 
 def extract_zip(paths: List[Path]):
-    paths_str = " ".join(str(p)  for p in paths)
+    # sorted_paths
+    sorted_paths = sorted(paths)
+    paths_str = " ".join(f"\'{str(p)}\'"  for p in sorted_paths)
+    print(f"Extracting files: {paths_str}")
     extract_command = (
         f"cat {paths_str} | "
         f"pigz -p {os.cpu_count()} -d | "
@@ -209,7 +212,6 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 data = response.json()
                 data["filecoin_hash"] = filecoin_hash
                 folder_name = data["folder_name"]
-                folder_path = Path.cwd()/folder_name
                 
                 paths = download_files_from_lighthouse(data)
                 if not paths:
@@ -218,6 +220,7 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 
                 try:
                     print("Extracting downloaded files")
+                    folder_path = Path.cwd()/folder_name
                     extract_zip(paths)      
                     source_path = folder_path / folder_name
                     print(f"Moving model to {local_path}")
@@ -226,12 +229,8 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                         shutil.rmtree(folder_path)
                     print(f"Model download complete: {local_path}")
                     return local_path
-                    
                 except Exception as e:
-                    print(f"Extraction error: {e}")
-                    if local_path.exists():
-                        local_path.unlink()
-                    raise
+                    print(f"Failed to extract files: {e}")
                     
         except Exception as e:
             print(f"Download attempt {attempt} failed: {e}")
