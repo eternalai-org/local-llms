@@ -9,6 +9,7 @@ import requests
 import hashlib
 from pathlib import Path
 import time
+from typing import List
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -163,16 +164,17 @@ def download_files_from_lighthouse(data: dict) -> bool:
                 print(f"Unexpected error for {cid}: {e}")
     
     assert len(result_paths) == num_of_files, f"Failed to download all files: {len(result_paths)} out of {num_of_files}"
-    return folder_path
+    return result_paths
 
-def extract_zip(folder_name: str):
+def extract_zip(paths: List[Path]):
+    paths_str = " ".join(str(p)  for p in paths)
     extract_command = (
-        f"cat '{folder_name}/{folder_name}'.zip.part-* | "
+        f"cat {paths_str} | "
         f"pigz -p {os.cpu_count()} -d | "
         f"tar -xf - -C ." 
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
-    print(f"Extracted files to {folder_name}")
+    print(f"Extracted files")
 
 
 def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_OUTPUT_DIR):
@@ -196,7 +198,6 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
     
     # Download the model metadata
     input_link = f"{GATEWAY_URL}{filecoin_hash}"
-    folder_path = None
     
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
@@ -208,15 +209,16 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 data = response.json()
                 data["filecoin_hash"] = filecoin_hash
                 folder_name = data["folder_name"]
+                folder_path = Path.cwd()/folder_name
                 
-                folder_path = download_files_from_lighthouse(data)
-                if not folder_path:
+                paths = download_files_from_lighthouse(data)
+                if not paths:
                     print("Failed to download model files")
                     continue
                 
                 try:
                     print("Extracting downloaded files")
-                    extract_zip(folder_name)      
+                    extract_zip(paths)      
                     source_path = folder_path / folder_name
                     print(f"Moving model to {local_path}")
                     shutil.move(source_path, local_path)                    
