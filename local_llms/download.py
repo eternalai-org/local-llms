@@ -1,5 +1,6 @@
 import requests
 import os
+from tqdm import tqdm
 import shutil
 import time
 from pathlib import Path
@@ -57,14 +58,14 @@ def compute_file_hash(file_path: Path, hash_algo: str = "sha256") -> str:
 def download_single_file(file_info: dict, folder_path: Path, max_attempts: int = MAX_ATTEMPTS) -> bool:
     """
     Download a single file from Lighthouse and verify its SHA256 hash, with retries.
-    
+
     Args:
-        file_info (dict): Contains 'cid' and 'file_hash'.
+        file_info (dict): Contains 'cid', 'file_hash', and 'file_name'.
         folder_path (Path): Directory to save the file.
         max_attempts (int): Number of retries on failure.
-    
+
     Returns:
-        bool: True if successful, False otherwise.
+        tuple: (Path to file if successful, None) or (None, error message).
     """
     cid = file_info["cid"]
     expected_hash = file_info["file_hash"]
@@ -72,35 +73,47 @@ def download_single_file(file_info: dict, folder_path: Path, max_attempts: int =
     file_path = folder_path / file_name
     attempts = 0
 
+    if file_path.exists():
+        computed_hash = compute_file_hash(file_path)
+        if computed_hash == expected_hash:
+            print(f"File {cid} already exists with correct hash.")
+            return file_path, None
+        else:
+            print(f"File {cid} already exists but hash mismatch. Retrying...")
+            file_path.unlink()
+
     while attempts < max_attempts:
         try:
-            # Construct download URL
             url = GATEWAY_URL + cid
-            # Stream the download
             response = requests.get(url, stream=True, timeout=100)
-            
+
             if response.status_code == 200:
-                # Write file in chunks
-                with file_path.open('wb') as f:
+                total_size = int(response.headers.get("content-length", 0))
+                with file_path.open("wb") as f, tqdm(
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=f"Downloading {file_name}",
+                    ncols=80
+                ) as progress:
                     for chunk in response.iter_content(chunk_size=4096):
                         if chunk:
                             f.write(chunk)
-                
-                # Verify hash
+                            progress.update(len(chunk))
+
                 computed_hash = compute_file_hash(file_path)
                 if computed_hash == expected_hash:
                     print(f"File {cid} downloaded and verified successfully.")
                     return file_path, None
                 else:
                     print(f"Hash mismatch for {cid}. Expected {expected_hash}, got {computed_hash}. Retrying...")
-                    file_path.unlink()  # Remove incorrect file
+                    file_path.unlink()
             else:
                 print(f"Failed to download {cid}. Status code: {response.status_code}")
-        
+
         except Exception as e:
             print(f"Exception while downloading {cid}: {e}")
-        
-        # Retry logic
+
         attempts += 1
         if attempts < max_attempts:
             print(f"Retrying in 5 seconds... (Attempt {attempts + 1}/{max_attempts})")
