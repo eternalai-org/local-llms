@@ -89,7 +89,7 @@ def parse_args():
         help="Hugging Face model file"
     )
     upload_command.add_argument(
-        "--ram", type=int, default=None,
+        "--ram", type=float, default=None,
         help="RAM in GB for the serving model at 4096 context length"
     )
     check_command = subparsers.add_parser(
