@@ -131,7 +131,7 @@ def download_files_from_lighthouse(data: dict) -> bool:
     filecoin_hash = data["filecoin_hash"]
     
     # IPFS gateway URL
-    max_workers = min(4, num_of_files)  # Limit concurrency to 4 or number of files
+    max_workers = min(2, num_of_files)  # Limit concurrency to 4 or number of files
     print(f"[LAUNCHER_LOGGER] [MODEL_INSTALL] --step {len(result_paths)}-{num_of_files} --hash {filecoin_hash}")
     # Use ThreadPoolExecutor for concurrent downloads
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
