@@ -124,7 +124,3 @@ def upload_folder_to_lighthouse(
         all_parts = [f for f in os.listdir(temp_dir) if f.startswith(f"{folder_name}.zip.part-")]
         sorted_parts = sorted(all_parts)
         extract_zip([Path(temp_dir) / part for part in sorted_parts])
-
-if __name__ == "__main__":
-    metadata_info, error =  upload_to_lighthouse(Path("/home/pc/local-llms/Phi-4-mini-instruct-Q8.json"))
-    print(metadata_info, error)
