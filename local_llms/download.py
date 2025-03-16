@@ -1,22 +1,19 @@
 import requests
-import os
 from tqdm import tqdm
 import shutil
 import time
 from pathlib import Path
 import httpx
 import requests
-import hashlib
 from pathlib import Path
 import time
-from typing import List
-import subprocess
+from local_llms.utils import compute_file_hash, extract_zip
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Constants
 GATEWAY_URL = "https://gateway.lighthouse.storage/ipfs/"
 DEFAULT_OUTPUT_DIR = Path.cwd() / "llms-storage"
-SLEEP_TIME = 30
+SLEEP_TIME = 60
 MAX_ATTEMPTS = 10
 CHUNK_SIZE = 1024
 POSTFIX_MODEL_PATH = ".gguf"
@@ -47,14 +44,6 @@ def check_downloaded_model(filecoin_hash: str, output_dir: Path = DEFAULT_OUTPUT
     except requests.RequestException as e:
         print(f"Failed to fetch model metadata: {e}")
         return False
-
-def compute_file_hash(file_path: Path, hash_algo: str = "sha256") -> str:
-    """Compute the hash of a file."""
-    hash_func = getattr(hashlib, hash_algo)()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_func.update(chunk)
-    return hash_func.hexdigest()
 
 def download_single_file(file_info: dict, folder_path: Path, max_attempts: int = MAX_ATTEMPTS) -> bool:
     """
@@ -117,7 +106,7 @@ def download_single_file(file_info: dict, folder_path: Path, max_attempts: int =
 
         attempts += 1
         if attempts < max_attempts:
-            print(f"Retrying in 5 seconds... (Attempt {attempts + 1}/{max_attempts})")
+            print(f"Retrying in {SLEEP_TIME} seconds... (Attempt {attempts + 1}/{max_attempts})")
             time.sleep(SLEEP_TIME)
         else:
             print(f"Failed to download {cid} after {max_attempts} attempts.")
@@ -165,20 +154,6 @@ def download_files_from_lighthouse(data: dict) -> bool:
     
     assert len(result_paths) == num_of_files, f"Failed to download all files: {len(result_paths)} out of {num_of_files}"
     return result_paths
-
-def extract_zip(paths: List[Path]):
-    # sorted_paths
-    sorted_paths = sorted(paths)
-    paths_str = " ".join(f"\'{str(p)}\'"  for p in sorted_paths)
-    print(f"Extracting files: {paths_str}")
-    extract_command = (
-        f"cat {paths_str} | "
-        f"pigz -p {os.cpu_count()} -d | "
-        f"tar -xf - -C ." 
-    )
-    subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
-    print(f"Extracted files")
-
 
 def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_OUTPUT_DIR):
     """

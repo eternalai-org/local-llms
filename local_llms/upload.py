@@ -1,24 +1,13 @@
 import os
 import json
-import shutil
 import time
-import hashlib
-import tempfile
-import subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from lighthouseweb3 import Lighthouse
 from dotenv import load_dotenv
+from local_llms.utils import compute_file_hash, compress_folder, extract_zip
 
 load_dotenv()
-
-def compute_file_hash(file_path: Path, hash_algo: str = "sha256") -> str:
-    """Compute the hash of a file."""
-    hash_func = getattr(hashlib, hash_algo)()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_func.update(chunk)
-    return hash_func.hexdigest()
 
 def upload_to_lighthouse(file_path: Path):
     """
@@ -47,30 +36,6 @@ def upload_to_lighthouse(file_path: Path):
     except Exception as e:
         print(f"Upload failed for {file_path}: {str(e)}")
         return None, str(e)
-
-def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int = 1) -> str:
-    """
-    Compress a folder into split parts using tar, pigz, and split.
-    """
-    if not os.path.isdir(model_folder):
-        raise ValueError(f"Invalid folder path: {model_folder}")
-    if not all(shutil.which(cmd) for cmd in ["tar", "pigz", "split"]):
-        raise RuntimeError("Required commands (tar, pigz, split) not found.")
-
-    temp_dir = tempfile.mkdtemp()
-    output_prefix = os.path.join(temp_dir, os.path.basename(model_folder) + ".zip.part-")
-    tar_command = (
-        f"tar -cf - '{model_folder}' | pigz --best -p {threads} | "
-        f"split -b {zip_chunk_size}M - '{output_prefix}'"
-    )
-
-    try:
-        subprocess.run(tar_command, shell=True, check=True)
-        print(f"Compressed to {temp_dir}")
-        return temp_dir
-    except subprocess.CalledProcessError as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(f"Compression failed: {e}")
 
 def upload_folder_to_lighthouse(
     folder_name: str, zip_chunk_size=512, max_retries=20, threads=16, max_workers=4, **kwargs
@@ -146,6 +111,7 @@ def upload_folder_to_lighthouse(
         print(f"Upload process failed: {str(e)}")
         return None, str(e)
     finally:
-        if temp_dir and os.path.exists(temp_dir) and not errors:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            print(f"Cleaned up temporary directory: {temp_dir}")
+        # merge the parts to the original folder
+        all_parts = [f for f in os.listdir(temp_dir) if f.startswith(f"{folder_name}.zip.part-")]
+        sorted_parts = sorted(all_parts)
+        extract_zip([Path(temp_dir) / part for part in sorted_parts])
