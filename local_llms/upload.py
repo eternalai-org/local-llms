@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from lighthouseweb3 import Lighthouse
 from dotenv import load_dotenv
 from local_llms.utils import compute_file_hash, compress_folder, extract_zip
+import tempfile
 
 load_dotenv()
 
@@ -53,7 +54,10 @@ def upload_folder_to_lighthouse(
         "files": [],
         **kwargs,
     }
-    metadata_path = Path.cwd() / f"{folder_name}.json"
+    # Need to import tempfile at the top if not already
+    metadata_fd, metadata_path_str = tempfile.mkstemp(suffix='.json', prefix=f"{folder_name}_")
+    os.close(metadata_fd)  # Close the file descriptor as we'll open it later
+    metadata_path = Path(metadata_path_str)
     temp_dir = None
 
     try:
@@ -101,7 +105,12 @@ def upload_folder_to_lighthouse(
         
         # upload metadata to Lighthouse
         metadata_info, error = upload_to_lighthouse(metadata_path)
+
         if metadata_info:
+            metadata['cid'] = metadata_info['cid']
+            final_metadata_path = Path.cwd()/f"{folder_name}_metadata.json"
+            with open(final_metadata_path, "w") as f:
+                json.dump(metadata, f, indent=4)
             print(f"Metadata uploaded: {metadata_info['cid']}")
             return metadata, None
         else:
@@ -115,3 +124,7 @@ def upload_folder_to_lighthouse(
         all_parts = [f for f in os.listdir(temp_dir) if f.startswith(f"{folder_name}.zip.part-")]
         sorted_parts = sorted(all_parts)
         extract_zip([Path(temp_dir) / part for part in sorted_parts])
+
+if __name__ == "__main__":
+    metadata_info, error =  upload_to_lighthouse(Path("/home/pc/local-llms/Phi-4-mini-instruct-Q8.json"))
+    print(metadata_info, error)
