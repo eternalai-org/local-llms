@@ -67,21 +67,35 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
+            health_check_url = f"http://localhost:{port}/health"
             # 20 minutes timeout for starting the service
             maximum_start_time = 1200  # 20 minutes
             start_time = time.time()
             while True:
                 if time.time() - start_time > maximum_start_time:
                     logger.error(f"Failed to start local LLM service within {maximum_start_time} seconds.")
+                    # Capture any output from the process for diagnosis
+                    stdout, stderr = process.communicate(timeout=1)
+                    logger.error(f"Process stdout: {stdout.decode() if stdout else 'None'}")
+                    logger.error(f"Process stderr: {stderr.decode() if stderr else 'None'}")
                     return False
                 try:
-                    status = requests.get("http://localhost:" + str(port) + "/health")
+                    logger.debug(f"Attempting health check at {health_check_url}")
+                    status = requests.get(health_check_url, timeout=5)
+                    logger.debug(f"Health check response: {status.status_code}")
                     if status.status_code == 200:
                         status_json = status.json()
+                        logger.debug(f"Health check JSON: {status_json}")
                         if status_json.get("status") == "ok":
                             break
                 except requests.exceptions.ConnectionError as e:
-                    print(f"Failed to connect to the service: {str(e)}")
+                    logger.debug(f"Failed to connect to the service: {str(e)}")
+                    # Check if process is still running
+                    if not psutil.pid_exists(process.pid):
+                        logger.error(f"Process with PID {process.pid} died unexpectedly")
+                        return False
+                except Exception as e:
+                    logger.debug(f"Health check error: {str(e)}")
                 time.sleep(1)
             self._dump_running_service(hash, port, process.pid)
             logger.info(f"Local LLM service started successfully on port {port} "
