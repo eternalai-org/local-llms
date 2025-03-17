@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import pickle
 import psutil
@@ -51,17 +52,17 @@ class LocalLLMManager:
                 return False
                 
             logger.info(f"Local LLM service starting for model: {local_model_path}")
-            
+            llama_server_path = shutil.which("llama-server")
+
             # Run llama-server in the background with additional safety checks
             command = [
-                "nohup", "llama-server",
+                "nohup", "'" + {llama_server_path} + "'",
                 "--jinja",
                 "--model", "'" + local_model_path + "'",
                 "--port", str(port),
                 "--host", host,
                 "-c", str(context_length),
-                "--pooling", "cls",
-                "&"
+                "--pooling", "cls"
             ]
             logger.info(f"Starting process with command: {command}")
             process = subprocess.Popen(
