@@ -35,38 +35,67 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Step 1: Check and install Homebrew if not present
-if ! command_exists brew; then
-    export PATH="$HOME/homebrew/bin:$PATH"
-fi
-
-# Step 2: Install or Update Python
-log_message "Checking existing Python version..."
-python3 --version || log_error "No Python installation found."
-
-log_message "Checking system Python..."
-if command_exists python3; then
-    log_message "Python is already installed on the system. Skipping Python installation."
+# Step 1: Detect architecture and check Homebrew
+if [[ $(uname -m) == "arm64" ]]; then
+    HOMEBREW_PATH="/opt/homebrew/bin"
+    log_message "Apple Silicon (M1/M2) Mac detected."
 else
-    log_message "No Python found. Installing Python using Homebrew..."
-    brew install python || handle_error $? "Failed to install Python"
+    HOMEBREW_PATH="/usr/local/bin"
+    log_message "Intel Mac detected."
 fi
 
-log_message "Verifying the installed Python version..."
-python3 --version || handle_error $? "Python installation verification failed"
+if [ -x "$HOMEBREW_PATH/brew" ]; then
+    export PATH="$HOMEBREW_PATH:$PATH"
+else
+    log_error "Homebrew not found. Please install Homebrew from https://brew.sh and run this script again."
+    exit 1
+fi
+
+# Step 2: Determine which Python to use
+if [ -x /usr/bin/python3 ]; then
+    system_python_version=$(/usr/bin/python3 --version 2>&1 | awk '{print $2}')
+    if [[ "$system_python_version" > "3.9" || "$system_python_version" == "3.9"* ]]; then
+        log_message "System Python version is $system_python_version (>= 3.9). Using system Python."
+        PYTHON_EXEC=/usr/bin/python3
+    else
+        log_message "System Python version is $system_python_version (< 3.9). Checking Homebrew's Python..."
+        if [ -x "$HOMEBREW_PATH/python3" ]; then
+            homebrew_python_version=$("$HOMEBREW_PATH/python3" --version 2>&1 | awk '{print $2}')
+            if [[ "$homebrew_python_version" > "3.9" || "$homebrew_python_version" == "3.9"* ]]; then
+                log_message "Homebrew's Python version is $homebrew_python_version (>= 3.9). Using Homebrew's Python."
+                PYTHON_EXEC="$HOMEBREW_PATH/python3"
+            else
+                log_message "Homebrew's Python version is $homebrew_python_version (< 3.9). Upgrading Python via Homebrew..."
+                brew upgrade python || handle_error $? "Failed to upgrade Python"
+                PYTHON_EXEC="$HOMEBREW_PATH/python3"
+            fi
+        else
+            log_message "No Homebrew Python found. Installing Python via Homebrew..."
+            brew install python || handle_error $? "Failed to install Python"
+            PYTHON_EXEC="$HOMEBREW_PATH/python3"
+        fi
+    fi
+else
+    log_message "No system Python found. Installing Python via Homebrew..."
+    brew install python || handle_error $? "Failed to install Python"
+    PYTHON_EXEC="$HOMEBREW_PATH/python3"
+fi
+
+log_message "Verifying the selected Python version..."
+$PYTHON_EXEC --version || handle_error $? "Python verification failed"
 log_message "Python setup complete."
 
 # Step 3: Update PATH in .zshrc
-log_message "Checking if PATH update is needed in .zshrc..."
-if ! grep -q 'export PATH="/opt/homebrew/bin:\$PATH"' ~/.zshrc; then
+log_message "Checking if Homebrew PATH update is needed in .zshrc..."
+if ! grep -q "export PATH=\"$HOMEBREW_PATH:\$PATH\"" ~/.zshrc; then
     log_message "Backing up current .zshrc..."
     cp ~/.zshrc ~/.zshrc.backup.$(date +%Y%m%d%H%M%S) || handle_error $? "Failed to backup .zshrc"
     
     log_message "Updating PATH in .zshrc..."
-    echo 'export PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc || handle_error $? "Failed to update .zshrc"
+    echo "export PATH=\"$HOMEBREW_PATH:\$PATH\"" >> ~/.zshrc || handle_error $? "Failed to update .zshrc"
     log_message "Please restart your terminal or run 'source ~/.zshrc' manually for changes to take effect."
 else
-    log_message "PATH already contains Homebrew bin directory."
+    log_message "PATH already contains Homebrew bin directory for this architecture."
 fi
 
 # Step 4: Install pigz
@@ -81,7 +110,7 @@ fi
 
 # Step 5: Create and activate Python virtual environment
 log_message "Creating virtual environment 'local_llms'..."
-python3 -m venv local_llms || handle_error $? "Failed to create virtual environment"
+$PYTHON_EXEC -m venv local_llms || handle_error $? "Failed to create virtual environment"
 
 log_message "Activating virtual environment..."
 if [ -f "local_llms/bin/activate" ]; then
@@ -115,14 +144,13 @@ log_message "llama.cpp setup complete."
 
 # Step 7: Set up local-llms toolkit
 log_message "Setting up local-llms toolkit..."
-# Check if local-llms is already installed
 if pip3 show local-llms &>/dev/null; then
     log_message "local-llms is already installed. Checking for updates..."
-    pip3 install -q --upgrade git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to update local-llms toolkit"
+    pip3 install -q --upgrade git+https://github.com/eternalai-org/local-llms.git@$(git ls-remote --tags --sort=-v:refname https://github.com/eternalai-org/local-llms.git | awk 'NR==1{print $2}' | sed 's/refs\/tags\///') || handle_error $? "Failed to update local-llms toolkit"
     log_message "local-llms toolkit is now up to date."
 else
     log_message "Installing local-llms toolkit for the first time..."
-    pip3 install -q git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to install local-llms toolkit"
+    pip3 install -q git+https://github.com/eternalai-org/local-llms.git@$(git ls-remote --tags --sort=-v:refname https://github.com/eternalai-org/local-llms.git | awk 'NR==1{print $2}' | sed 's/refs\/tags\///') || handle_error $? "Failed to install local-llms toolkit"
     log_message "local-llms toolkit installed successfully."
 fi
 
