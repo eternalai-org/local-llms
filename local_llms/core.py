@@ -1,6 +1,8 @@
 import os
+import time
 import pickle
 import psutil
+import requests
 import subprocess
 from pathlib import Path
 from loguru import logger
@@ -65,6 +67,22 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
+            # 20 minutes timeout for starting the service
+            maximum_start_time = 1200  # 20 minutes
+            start_time = time.time()
+            while True:
+                if time.time() - start_time > maximum_start_time:
+                    logger.error(f"Failed to start local LLM service within {maximum_start_time} seconds.")
+                    return False
+                try:
+                    status = requests.get("http://localhost:" + str(port) + "/health")
+                    if status.status_code == 200:
+                        status_json = status.json()
+                        if status_json.get("status") == "ok":
+                            break
+                except requests.exceptions.ConnectionError:
+                    pass
+                time.sleep(1)
             self._dump_running_service(hash, port, process.pid)
             logger.info(f"Local LLM service started successfully on port {port} "
                        f"for model: {hash}")
