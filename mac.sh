@@ -144,13 +144,14 @@ log_message "llama.cpp setup complete."
 
 # Step 7: Set up local-llms toolkit
 log_message "Setting up local-llms toolkit..."
+
 if pip3 show local-llms &>/dev/null; then
     log_message "local-llms is already installed. Checking for updates..."
-    pip3 install -q --upgrade git+https://github.com/eternalai-org/local-llms.git@$(git ls-remote --tags --sort=-v:refname https://github.com/eternalai-org/local-llms.git | awk 'NR==1{print $2}' | sed 's/refs\/tags\///') || handle_error $? "Failed to update local-llms toolkit"
+    pip3 install -q --upgrade git+https://github.com/eternalai-org/local-llms.git|| handle_error $? "Failed to update local-llms toolkit"
     log_message "local-llms toolkit is now up to date."
 else
     log_message "Installing local-llms toolkit for the first time..."
-    pip3 install -q git+https://github.com/eternalai-org/local-llms.git@$(git ls-remote --tags --sort=-v:refname https://github.com/eternalai-org/local-llms.git | awk 'NR==1{print $2}' | sed 's/refs\/tags\///') || handle_error $? "Failed to install local-llms toolkit"
+    pip3 install -q git+https://github.com/eternalai-org/local-llms.git|| handle_error $? "Failed to install local-llms toolkit"
     log_message "local-llms toolkit installed successfully."
 fi
 

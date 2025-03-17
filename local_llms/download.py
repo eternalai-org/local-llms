@@ -181,55 +181,37 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
         try:
             print(f"Downloading model metadata (attempt {attempt}/{MAX_ATTEMPTS})")
             
-            # Use a timeout dictionary for more granular control
-            timeout = httpx.Timeout(connect=30, read=HTTPX_TIMEOUT, write=HTTPX_TIMEOUT)
-            with httpx.Client(follow_redirects=True, timeout=timeout) as client:
+            with httpx.Client(follow_redirects=True, timeout=HTTPX_TIMEOUT) as client:
                 response = client.get(input_link)
                 response.raise_for_status()
                 data = response.json()
                 data["filecoin_hash"] = filecoin_hash
                 folder_name = data["folder_name"]
                 
-                folder_path = Path.cwd() / folder_name
-                
-                # Download all files
                 paths = download_files_from_lighthouse(data)
                 if not paths:
                     print("Failed to download model files")
-                    continue
-                
+                    continue      
                 try:
                     print("Extracting downloaded files")
-                    extract_zip(paths)
-                    
+                    folder_path = Path.cwd()/folder_name
+                    extract_zip(paths)      
                     source_path = folder_path / folder_name
-                    if not source_path.exists():
-                        raise FileNotFoundError(f"Expected model file not found at {source_path}")
-                        
                     print(f"Moving model to {local_path}")
-                    # Use replace instead of move for better cross-platform compatibility
-                    if local_path.exists():
-                        local_path.unlink()
-                    shutil.move(source_path, local_path)
-                    
+                    shutil.move(source_path, local_path)                    
+                    if folder_path.exists():
+                        shutil.rmtree(folder_path, ignore_errors=True)
                     print(f"Model download complete: {local_path}")
                     return local_path
                 except Exception as e:
-                    print(f"Failed to process files: {e}")
-                finally:
-                    # Clean up regardless of success or failure
-                    if folder_path.exists():
-                        shutil.rmtree(folder_path, ignore_errors=True)
+                    print(f"Failed to extract files: {e}")
                     
         except Exception as e:
-            print(f"Download attempt {attempt} failed: {str(e)}")
-            
-        # Only sleep if we're going to retry
-        if attempt < MAX_ATTEMPTS:
-            # Cap the exponential backoff at 5 minutes
-            backoff = min(SLEEP_TIME * (2 ** (attempt - 1)), 300)
-            print(f"Retrying in {backoff} seconds")
-            time.sleep(backoff)
+            print(f"Download attempt {attempt} failed: {e}")
+            if attempt < MAX_ATTEMPTS:
+                backoff = min(SLEEP_TIME * (2 ** (attempt - 1)), 300)  # Exponential backoff capped at 5 min
+                print(f"Retrying in {backoff} seconds")
+                time.sleep(backoff)
     
     print("All download attempts failed")
     return None
