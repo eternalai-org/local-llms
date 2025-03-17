@@ -192,20 +192,6 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 if not paths:
                     print("Failed to download model files")
                     continue
-                
-                try:
-                    print("Extracting downloaded files")
-                    folder_path = Path.cwd()/folder_name
-                    extract_zip(paths)      
-                    source_path = folder_path / folder_name
-                    print(f"Moving model to {local_path}")
-                    shutil.move(source_path, local_path)                    
-                    if folder_path.exists():
-                        shutil.rmtree(folder_path, ignore_errors=True)
-                    print(f"Model download complete: {local_path}")
-                    return local_path
-                except Exception as e:
-                    print(f"Failed to extract files: {e}")
                     
         except Exception as e:
             print(f"Download attempt {attempt} failed: {e}")
@@ -213,6 +199,23 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 backoff = min(SLEEP_TIME * (2 ** (attempt - 1)), 300)  # Exponential backoff capped at 5 min
                 print(f"Retrying in {backoff} seconds")
                 time.sleep(backoff)
+
+    try:
+        print("Extracting downloaded files")
+        folder_path = Path.cwd()/folder_name
+        extract_zip(paths)      
+        source_path = folder_path / folder_name
+        print(f"Moving model to {local_path}")
+        if source_path.exists():
+            shutil.move(source_path, local_path)
+        else:
+            print(f"Model folder not found: {source_path}")
+        if folder_path.exists():
+            shutil.rmtree(folder_path, ignore_errors=True)
+        print(f"Model download complete: {local_path}")
+        return local_path
+    except Exception as e:
+        print(f"Failed to extract files: {e}")
     
     print("All download attempts failed")
     return None

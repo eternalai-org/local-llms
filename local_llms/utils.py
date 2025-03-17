@@ -43,7 +43,7 @@ def extract_zip(paths: List[Path]):
         f"tar -xf - -C ." 
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
-    print(f"Extracted files")
+    print(f"{extract_command} completed successfully")
 
 def compute_file_hash(file_path: Path, hash_algo: str = "sha256") -> str:
     """Compute the hash of a file."""
