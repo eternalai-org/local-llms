@@ -53,16 +53,18 @@ class LocalLLMManager:
             logger.info(f"Local LLM service starting for model: {local_model_path}")
             
             # Run llama-server in the background with additional safety checks
+            command = [
+                "nohup", "llama-server",
+                "--jinja",
+                "--model", "'" + local_model_path + "'",
+                "--port", str(port),
+                "--host", host,
+                "-c", str(context_length),
+                "--pooling", "cls"
+            ]
+            logger.info(f"Starting process with command: {command}")
             process = subprocess.Popen(
-                [
-                    "nohup", "llama-server",
-                    "--jinja",
-                    "--model", "\'" + local_model_path + "\'",
-                    "--port", str(port),
-                    "--host", host,
-                    "-c", str(context_length),
-                    "--pooling", "cls"
-                ],
+                command,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
