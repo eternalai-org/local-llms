@@ -1,13 +1,12 @@
 import os
 import json
 import time
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from lighthouseweb3 import Lighthouse
-from dotenv import load_dotenv
-from local_llms.utils import compute_file_hash, compress_folder, extract_zip
 import tempfile
-
+from pathlib import Path
+from dotenv import load_dotenv
+from lighthouseweb3 import Lighthouse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from local_llms.utils import compute_file_hash, compress_folder, extract_zip
 load_dotenv()
 
 def upload_to_lighthouse(file_path: Path):

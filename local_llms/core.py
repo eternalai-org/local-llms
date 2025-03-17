@@ -32,7 +32,7 @@ class LocalLLMManager:
         """
         if not hash:
             raise ValueError("Filecoin hash is required to start the service")
-         
+        
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
             local_model_path = download_model_from_filecoin(hash)
@@ -99,6 +99,7 @@ class LocalLLMManager:
             return False
         
     def _dump_running_service(self, hash, port, pid):
+
         """Dump the running service details to a file."""
         service_info = {"hash": hash, "port": port, "pid": pid}
         with open("running_service.pkl", "wb") as f:
@@ -106,17 +107,30 @@ class LocalLLMManager:
 
     def get_running_model(self) -> Optional[str]:
         """
-        Get the name of the currently running model.
+        Get the hash of the currently running model.
         
         Returns:
-            Optional[str]: Name of the currently running model, or None if no model is running
+            Optional[str]: Hash of the currently running model, or None if no model is running
         """
-        if not os.path.exists("running_service.pkl"):
+        if not os.path.exists(self.pickle_file):
             return None
         
-        with open("running_service.pkl", "rb") as f:
-            service_info = pickle.load(f)
-            return service_info.get("hash")
+        try:
+            with open(self.pickle_file, "rb") as f:
+                service_info = pickle.load(f)
+            
+            service_port = service_info.get("port")
+            response = requests.get(f"http://localhost:{service_port}/health", timeout=2)
+            
+            if response.status_code == 200 and response.json().get("status") == "ok":
+                return service_info.get("hash")
+        except Exception:
+            pass
+        
+        # Service not healthy or error occurred, clean up
+        if os.path.exists(self.pickle_file):
+            os.remove(self.pickle_file)
+        return None
 
     def stop(self) -> bool:
         """
