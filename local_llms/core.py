@@ -1,11 +1,13 @@
 import os
+import time
 import pickle
 import psutil
+import requests
 import subprocess
 from pathlib import Path
 from loguru import logger
 from typing import Optional
-from local_llms.download import download_and_extract_model
+from local_llms.download import download_model_from_filecoin
 
 class LocalLLMManager:
     """Manages a local Large Language Model (LLM) service."""
@@ -33,7 +35,7 @@ class LocalLLMManager:
          
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
-            local_model_path = download_and_extract_model(hash)
+            local_model_path = download_model_from_filecoin(hash)
             if os.path.exists("running_service.pkl"):
                 with open("running_service.pkl", "rb") as f:
                     service_info = pickle.load(f)
@@ -65,6 +67,22 @@ class LocalLLMManager:
                 stderr=subprocess.DEVNULL,
                 preexec_fn=os.setsid  # Ensures process survives parent termination
             )
+            # 20 minutes timeout for starting the service
+            maximum_start_time = 1200  # 20 minutes
+            start_time = time.time()
+            while True:
+                if time.time() - start_time > maximum_start_time:
+                    logger.error(f"Failed to start local LLM service within {maximum_start_time} seconds.")
+                    return False
+                try:
+                    status = requests.get("http://localhost:" + str(port) + "/health")
+                    if status.status_code == 200:
+                        status_json = status.json()
+                        if status_json.get("status") == "ok":
+                            break
+                except requests.exceptions.ConnectionError:
+                    pass
+                time.sleep(1)
             self._dump_running_service(hash, port, process.pid)
             logger.info(f"Local LLM service started successfully on port {port} "
                        f"for model: {hash}")
