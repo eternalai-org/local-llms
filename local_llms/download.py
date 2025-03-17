@@ -188,17 +188,18 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 data["filecoin_hash"] = filecoin_hash
                 folder_name = data["folder_name"]
                 folder_path = Path.cwd()/folder_name
-                folder_path.mkdir(exist_ok=True, parents=True)                
+                folder_path.mkdir(exist_ok=True, parents=True)   
                 paths = download_files_from_lighthouse(data)
                 if not paths:
                     print("Failed to download model files")
                     continue      
                 try:  
-                    extract_zip(paths, folder_path)
+                    extract_zip(paths)
                 except Exception as e:
                     print(f"Failed to extract files: {e}")
                 try:
                     source_path = folder_path / folder_name
+                    source_path = source_path.absolute()
                     print(f"Moving model to {local_path}")
                     shutil.move(str(source_path), str(local_path))                    
                     if folder_path.exists():

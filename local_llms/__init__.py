@@ -1,2 +1,2 @@
 """Local LLMs - A library to manage local language models."""
-__version__ = "2.0.9"
+__version__ = "2.10.0"

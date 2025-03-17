@@ -31,9 +31,9 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise RuntimeError(f"Compression failed: {e}")
 
-def extract_zip(paths: List[Path], target: Path):
+def extract_zip(paths: List[Path]):
     # Use the absolute path only once.
-    target_abs = target.absolute()
+    target_abs = Path.cwd().absolute()
     target_dir = f"'{target_abs}'"
     print(f"Extracting files to: {target_dir}")
 
