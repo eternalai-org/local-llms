@@ -187,18 +187,17 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                 data = response.json()
                 data["filecoin_hash"] = filecoin_hash
                 folder_name = data["folder_name"]
-                
+                folder_path = Path.cwd()/folder_name
+                folder_path.mkdir(exist_ok=True, parents=True)                
                 paths = download_files_from_lighthouse(data)
                 if not paths:
                     print("Failed to download model files")
                     continue      
+                try:  
+                    extract_zip(paths, folder_path)
+                except Exception as e:
+                    print(f"Failed to extract files: {e}")
                 try:
-                    print("Extracting downloaded files")
-                    folder_path = Path.cwd()/folder_name
-                    folder_path.mkdir(exist_ok=True, parents=True)
-                    absolute_folder_path = folder_path.absolute()
-                    print(f"Extracting files to: {str(absolute_folder_path)}")
-                    extract_zip(paths, str(absolute_folder_path))
                     source_path = folder_path / folder_name
                     print(f"Moving model to {local_path}")
                     shutil.move(str(source_path), str(local_path))                    
@@ -207,8 +206,8 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                     print(f"Model download complete: {local_path}")
                     return local_path
                 except Exception as e:
-                    print(f"Failed to extract files: {e}")
-                    
+                    print(f"Failed to move model: {e}")
+            
         except Exception as e:
             print(f"Download attempt {attempt} failed: {e}")
             if attempt < MAX_ATTEMPTS:

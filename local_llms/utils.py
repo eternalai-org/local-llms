@@ -31,17 +31,23 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise RuntimeError(f"Compression failed: {e}")
 
-def extract_zip(paths: List[Path], path: Path = None):
-    to_extract_zip_path = str(path) if path else "."
-    print(f"Extracting files to: {to_extract_zip_path}")
-    # sorted_paths
-    sorted_paths = sorted(paths)
-    paths_str = " ".join(f"\'{str(p)}\'"  for p in sorted_paths)
+def extract_zip(paths: List[Path], target: Path):
+    # Use the absolute path only once.
+    target_abs = target.absolute()
+    target_dir = f"'{target_abs}'"
+    print(f"Extracting files to: {target_dir}")
+
+    # Sort paths by their string representation.
+    sorted_paths = sorted(paths, key=lambda p: str(p))
+    # Quote each path after converting to its absolute path.
+    paths_str = " ".join(f"'{p.absolute()}'" for p in sorted_paths)
     print(f"Extracting files: {paths_str}")
+
+    cpus = os.cpu_count() or 1
     extract_command = (
         f"cat {paths_str} | "
-        f"pigz -p {os.cpu_count()} -d | "
-        f"tar -xf - -C {to_extract_zip_path}" 
+        f"pigz -p {cpus} -d | "
+        f"tar -xf - -C {target_dir}"
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
     print(f"{extract_command} completed successfully")
