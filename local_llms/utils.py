@@ -26,7 +26,7 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
 
     try:
         subprocess.run(tar_command, shell=True, check=True)
-        print(f"Compressed to {temp_dir}")
+        print(f"{tar_command} completed successfully")
         return temp_dir
     except subprocess.CalledProcessError as e:
         shutil.rmtree(temp_dir, ignore_errors=True)

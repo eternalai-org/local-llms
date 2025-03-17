@@ -201,7 +201,7 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                     print(f"Moving model to {local_path}")
                     shutil.move(source_path, local_path)                    
                     if folder_path.exists():
-                        shutil.rmtree(folder_path)
+                        shutil.rmtree(folder_path, ignore_errors=True)
                     print(f"Model download complete: {local_path}")
                     return local_path
                 except Exception as e:
