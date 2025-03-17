@@ -55,21 +55,22 @@ class LocalLLMManager:
             llama_server_path = shutil.which("llama-server")
 
             # Run llama-server in the background with additional safety checks
+            # Removed unnecessary quotes, 'nohup' and '&' since subprocess.Popen handles background execution.
             command = [
-                "nohup", f"'{llama_server_path}'",
+                llama_server_path,
                 "--jinja",
-                "--model", f"'{local_model_path}'",
+                "--model", str(local_model_path),
                 "--port", str(port),
                 "--host", host,
                 "-c", str(context_length),
-                "--pooling", "cls", "&"
+                "--pooling", "cls"
             ]
-            logger.info(f"Starting process with command: {command}")
+            logger.info(f"Starting process with command: {' '.join(command)}")
             process = subprocess.Popen(
                 command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                preexec_fn=os.setsid  # Ensures process survives parent termination
+                stdout=subprocess.DEVNULL,  # Suppress output (or redirect to a file)
+                stderr=subprocess.DEVNULL,  # Suppress errors (or redirect to a file)
+                preexec_fn=os.setsid       # Detach process into a new session (Unix-like systems only)
             )
             health_check_url = f"http://localhost:{port}/health"
             # 20 minutes timeout for starting the service
