@@ -28,7 +28,7 @@ def parse_args():
         help="Port number for the local language model server"
     )
     start_command.add_argument(
-        "--host", type=str, default="172.0.0.1",
+        "--host", type=str, default="0.0.0.0",
         help="Host address for the local language model server"
     )
     start_command.add_argument(

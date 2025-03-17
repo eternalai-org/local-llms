@@ -57,7 +57,7 @@ class LocalLLMManager:
                 [
                     "nohup", "llama-server",
                     "--jinja",
-                    "--model", local_model_path,
+                    "--model", "\'" + local_model_path + "\'",
                     "--port", str(port),
                     "--host", host,
                     "-c", str(context_length),

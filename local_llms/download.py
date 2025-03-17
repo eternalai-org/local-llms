@@ -168,6 +168,7 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
     """
     output_dir.mkdir(exist_ok=True, parents=True)
     local_path = output_dir / f"{filecoin_hash}{POSTFIX_MODEL_PATH}"
+    local_path = str(local_path.absolute())
     
     # Check if the model is already downloaded
     if check_downloaded_model(filecoin_hash, output_dir):
@@ -201,7 +202,7 @@ def download_model_from_filecoin(filecoin_hash: str, output_dir: Path = DEFAULT_
                     source_path = folder_path / folder_name
                     source_path = source_path.absolute()
                     print(f"Moving model to {local_path}")
-                    shutil.move(str(source_path), str(local_path))                    
+                    shutil.move(str(source_path), local_path)                    
                     if folder_path.exists():
                         shutil.rmtree(folder_path, ignore_errors=True)
                     print(f"Model download complete: {local_path}")
