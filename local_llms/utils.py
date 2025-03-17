@@ -23,7 +23,6 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
         f"tar -cf - '{model_folder}' | pigz --best -p {threads} | "
         f"split -b {zip_chunk_size}M - '{output_prefix}'"
     )
-
     try:
         subprocess.run(tar_command, shell=True, check=True)
         print(f"{tar_command} completed successfully")
@@ -32,7 +31,9 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise RuntimeError(f"Compression failed: {e}")
 
-def extract_zip(paths: List[Path]):
+def extract_zip(paths: List[Path], path: Path = None):
+    to_extract_zip_path = str(path) if path else "."
+    print(f"Extracting files to: {to_extract_zip_path}")
     # sorted_paths
     sorted_paths = sorted(paths)
     paths_str = " ".join(f"\'{str(p)}\'"  for p in sorted_paths)
@@ -40,7 +41,7 @@ def extract_zip(paths: List[Path]):
     extract_command = (
         f"cat {paths_str} | "
         f"pigz -p {os.cpu_count()} -d | "
-        f"tar -xf - -C ." 
+        f"tar -xf - -C {to_extract_zip_path}" 
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
     print(f"{extract_command} completed successfully")
