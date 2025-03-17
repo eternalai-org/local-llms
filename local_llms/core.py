@@ -56,9 +56,9 @@ class LocalLLMManager:
 
             # Run llama-server in the background with additional safety checks
             command = [
-                "nohup", "'" + {llama_server_path} + "'",
+                "nohup", f"'{llama_server_path}'",
                 "--jinja",
-                "--model", "'" + local_model_path + "'",
+                "--model", f"'{local_model_path}'",
                 "--port", str(port),
                 "--host", host,
                 "-c", str(context_length),
