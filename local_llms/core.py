@@ -37,15 +37,15 @@ class LocalLLMManager:
         try:
             logger.info(f"Starting local LLM service for model with hash: {hash}")
             local_model_path = download_model_from_filecoin(hash)
-            if os.path.exists("running_service.pkl"):
-                with open("running_service.pkl", "rb") as f:
-                    service_info = pickle.load(f)
-                    if service_info.get("hash") == hash:
-                        logger.warning(f"Model '{hash}' is already running on port {service_info.get('port')}")
-                        return True
-                    else:
-                        logger.info(f"Stopping existing model '{hash}' running on port {service_info.get('port')}")
-                        self.stop()
+            model_running = self.get_running_model()
+            if model_running:
+                if model_running == hash:
+                    logger.warning(f"Model '{hash}' is already running on port {port}")
+                    return True
+                else:
+                    logger.info(f"Stopping existing model '{model_running}' running on port {port}")
+                    self.stop()
+
             
             if not os.path.exists(local_model_path):
                 logger.error(f"Model file not found at: {local_model_path}")
@@ -126,28 +126,28 @@ class LocalLLMManager:
 
     def get_running_model(self) -> Optional[str]:
         """
-        Get the name of the currently running model.
-        
+        Get currently running model hash if the service is healthy.
+
         Returns:
-            Optional[str]: Name of the currently running model, or None if no model is running
+            Optional[str]: Running model hash or None if no healthy service exists.
         """
-        if not os.path.exists("running_service.pkl"):
+        if not self.pickle_file.exists():
             return None
-        
+
         try:
-            with open(self.pickle_file, "rb") as f:
+            with self.pickle_file.open("rb") as f:
                 service_info = pickle.load(f)
-                service_port = service_info.get("port")
-            
-            # Try health check with timeout to avoid hanging
+            service_port = service_info.get("port")
             response = requests.get(f"http://localhost:{service_port}/health", timeout=2)
-            if response.status_code != 200 or response.json().get("status") != "ok":
-                # Service not healthy, remove stale file
-                os.remove(self.pickle_file)
-        except (requests.exceptions.RequestException, OSError, pickle.UnpickleError):
-            # Service not responding or file issues, clean up
-            if os.path.exists(self.pickle_file):
-                os.remove(self.pickle_file)
+            if response.status_code == 200 and response.json().get("status") == "ok":
+                return service_info.get("hash")
+        except (requests.exceptions.RequestException, OSError, pickle.UnpicklingError):
+            pass
+
+        # Clean up if the health check fails or an error occurs
+        if self.pickle_file.exists():
+            self.pickle_file.unlink()
+        return None
 
     def stop(self) -> bool:
         """
