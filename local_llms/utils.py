@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 
+
 def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int = 1) -> str:
     """
     Compress a folder into split parts using tar, pigz, and split.
@@ -20,7 +21,8 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
     temp_dir = tempfile.mkdtemp()
     output_prefix = os.path.join(temp_dir, os.path.basename(model_folder) + ".zip.part-")
     tar_command = (
-        f"tar -cf - '{model_folder}' | pigz --best -p {threads} | "
+        f"{os.environ['TAR_COMMAND']} -cf - '{model_folder}' | "
+        f"{os.environ['PIGZ_COMMAND']} --best -p {threads} | "
         f"split -b {zip_chunk_size}M - '{output_prefix}'"
     )
     try:
@@ -37,6 +39,13 @@ def extract_zip(paths: List[Path]):
     target_dir = f"'{target_abs}'"
     print(f"Extracting files to: {target_dir}")
 
+    # Get absolute paths for required commands.
+    cat_path = shutil.which("cat")
+    pigz_cmd = os.environ.get("PIGZ_COMMAND")
+    tar_cmd = os.environ.get("TAR_COMMAND")
+    if not (cat_path and pigz_cmd and tar_cmd):
+        raise RuntimeError("Required commands (cat, TAR_COMMAND, PIGZ_COMMAND) not found.")
+
     # Sort paths by their string representation.
     sorted_paths = sorted(paths, key=lambda p: str(p))
     # Quote each path after converting to its absolute path.
@@ -45,9 +54,9 @@ def extract_zip(paths: List[Path]):
 
     cpus = os.cpu_count() or 1
     extract_command = (
-        f"cat {paths_str} | "
-        f"pigz -p {cpus} -d | "
-        f"tar -xf - -C {target_dir}"
+        f"{cat_path} {paths_str} | "
+        f"{pigz_cmd} -p {cpus} -d | "
+        f"{tar_cmd} -xf - -C {target_dir}"
     )
     subprocess.run(extract_command, shell=True, check=True, capture_output=True, text=True)
     print(f"{extract_command} completed successfully")

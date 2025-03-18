@@ -52,7 +52,9 @@ class LocalLLMManager:
                 return False
                 
             logger.info(f"Local LLM service starting for model: {local_model_path}")
-            llama_server_path = shutil.which("llama-server")
+            llama_server_path = os.getenv("LLAMA_SERVER_PATH")
+            if not llama_server_path:
+                logger.error("llama-server executable not found in PATH or LLAMA_SERVER_PATH environment variable.")
 
             # Run llama-server in the background with additional safety checks
             # Removed unnecessary quotes, 'nohup' and '&' since subprocess.Popen handles background execution.
