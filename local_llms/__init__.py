@@ -10,8 +10,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 """Local LLMs - A library to manage local language models."""
-__version__ = "2.20.0"
-COMMAND_DIRS = ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"]
+__version__ = "2.21.0"
+COMMAND_DIRS = [
+    "/usr/local/bin",
+    os.path.join(os.path.expanduser("~"), "homebrew", "bin"),
+    "/opt/homebrew/bin",
+    "/usr/bin",
+    "/bin"
+]
 
 # Get the current PATH
 current_path = os.environ.get("PATH", "")
