@@ -10,7 +10,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 """Local LLMs - A library to manage local language models."""
-__version__ = "2.19.0"
+__version__ = "2.20.0"
 COMMAND_DIRS = ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"]
 
 # Get the current PATH
@@ -53,12 +53,26 @@ except Exception as e:
     logger.error(f"Failed to find pigz: {str(e)}", exc_info=True)
     raise RuntimeError(f"Failed to find pigz: {str(e)}")
 
+# New section: search for cat command
+try:
+    logger.info("Searching for cat in command directories and PATH")
+    cat_cmd = shutil.which("cat", path=search_path)
+    if not cat_cmd:
+        logger.error("cat command not found in command directories or PATH")
+        raise RuntimeError("cat command not found in command directories or PATH.")
+    logger.info(f"Found cat at: {cat_cmd}")
+except Exception as e:
+    logger.error(f"Failed to find cat: {str(e)}", exc_info=True)
+    raise RuntimeError(f"Failed to find cat: {str(e)}")
+
 # Export the found paths to the environment
 os.environ["LLAMA_SERVER_PATH"] = llama_server_path
 os.environ["TAR_COMMAND"] = tar_cmd
 os.environ["PIGZ_COMMAND"] = pigz_cmd
+os.environ["CAT_COMMAND"] = cat_cmd
 
 # Log the exported paths
 logger.info(f"Exported LLAMA_SERVER_PATH: {llama_server_path}")
 logger.info(f"Exported TAR_COMMAND: {tar_cmd}")
 logger.info(f"Exported PIGZ_COMMAND: {pigz_cmd}")
+logger.info(f"Exported CAT_COMMAND: {cat_cmd}")

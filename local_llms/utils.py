@@ -13,11 +13,6 @@ def compress_folder(model_folder: str, zip_chunk_size: int = 128, threads: int =
     """
     Compress a folder into split parts using tar, pigz, and split.
     """
-    if not os.path.isdir(model_folder):
-        raise ValueError(f"Invalid folder path: {model_folder}")
-    if not all(shutil.which(cmd) for cmd in ["tar", "pigz", "split"]):
-        raise RuntimeError("Required commands (tar, pigz, split) not found.")
-
     temp_dir = tempfile.mkdtemp()
     output_prefix = os.path.join(temp_dir, os.path.basename(model_folder) + ".zip.part-")
     tar_command = (
@@ -40,7 +35,7 @@ def extract_zip(paths: List[Path]):
     print(f"Extracting files to: {target_dir}")
 
     # Get absolute paths for required commands.
-    cat_path = shutil.which("cat")
+    cat_path = os.environ.get("CAT_COMMAND")
     pigz_cmd = os.environ.get("PIGZ_COMMAND")
     tar_cmd = os.environ.get("TAR_COMMAND")
     if not (cat_path and pigz_cmd and tar_cmd):
