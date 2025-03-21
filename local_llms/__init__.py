@@ -10,7 +10,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 """Local LLMs - A library to manage local language models."""
-__version__ = "2.21.0"
+__version__ = "2.22.0"
 COMMAND_DIRS = [
     "/usr/local/bin",
     os.path.join(os.path.expanduser("~"), "homebrew", "bin"),
