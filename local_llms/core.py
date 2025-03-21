@@ -65,7 +65,7 @@ class LocalLLMManager:
                 "--port", str(port),
                 "--host", host,
                 "-c", str(context_length),
-                "--pooling", "cls"
+                "--pooling", "mean"
             ]
             logger.info(f"Starting process with command: {' '.join(command)}")
             process = subprocess.Popen(

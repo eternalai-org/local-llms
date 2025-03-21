@@ -35,95 +35,115 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
-# Step 1: Check and install Homebrew if not present
+# Step 1: Ensure Homebrew is installed and set PATH
 if ! command_exists brew; then
-    export PATH="$HOME/homebrew/bin:$PATH"
+    log_error "Homebrew is not installed. Please install Homebrew first: https://brew.sh/"
+    exit 1
 fi
 
-# Step 2: Install or Update Python
-log_message "Checking existing Python version..."
-python3 --version || log_error "No Python installation found."
+BREW_PREFIX=$(brew --prefix)
+export PATH="$BREW_PREFIX/bin:$PATH"
+log_message "Homebrew found at $BREW_PREFIX. PATH updated for this session."
 
-log_message "Checking system Python..."
+# Step 2: Check system Python version and decide on installation
+PYTHON_CMD="$BREW_PREFIX/bin/python3"  # Default to Homebrew Python
+log_message "Checking system Python version..."
 if command_exists python3; then
-    log_message "Python is already installed on the system. Skipping Python installation."
-else
-    log_message "No Python found. Installing Python using Homebrew..."
-    brew install python || handle_error $? "Failed to install Python"
+    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+    PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+    PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+    
+    log_message "Found system Python version: $PYTHON_VERSION"
+    
+    # Check if version is >= 3.11
+    if [ "$PYTHON_MAJOR" -gt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; }; then
+        log_message "System Python is >= 3.11. Using existing Python."
+        PYTHON_CMD="python3"  # Use system Python
+    else
+        log_message "System Python is < 3.11. Checking Homebrew Python..."
+    fi
 fi
 
-log_message "Verifying the installed Python version..."
-python3 --version || handle_error $? "Python installation verification failed"
+# If no suitable system Python, install or verify Homebrew Python
+if [ "$PYTHON_CMD" = "$BREW_PREFIX/bin/python3" ]; then
+    if ! "$PYTHON_CMD" --version &>/dev/null; then
+        log_message "Installing Python via Homebrew (requires >= 3.11)..."
+        brew install python || handle_error $? "Failed to install Python"
+    fi
+    log_message "Verifying Homebrew Python version..."
+    "$PYTHON_CMD" --version || handle_error $? "Python verification failed"
+fi
+
+log_message "Using Python at: $(which $PYTHON_CMD)"
 log_message "Python setup complete."
 
-# Step 3: Update PATH in .zshrc
+# Step 3: Update PATH in .zshrc for future sessions
 log_message "Checking if PATH update is needed in .zshrc..."
-if ! grep -q 'export PATH="/opt/homebrew/bin:\$PATH"' ~/.zshrc; then
-    log_message "Backing up current .zshrc..."
-    cp ~/.zshrc ~/.zshrc.backup.$(date +%Y%m%d%H%M%S) || handle_error $? "Failed to backup .zshrc"
+if ! grep -q "export PATH=\"/usr/local/bin:\$PATH\"" ~/.zshrc 2>/dev/null; then
+    if [ -f ~/.zshrc ]; then
+        log_message "Backing up current .zshrc..."
+        cp ~/.zshrc ~/.zshrc.backup.$(date +%Y%m%d%H%M%S) || handle_error $? "Failed to backup .zshrc"
+    else
+        log_message "No existing .zshrc found. Skipping backup."
+    fi
     
-    log_message "Updating PATH in .zshrc..."
-    echo 'export PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc || handle_error $? "Failed to update .zshrc"
-    log_message "Please restart your terminal or run 'source ~/.zshrc' manually for changes to take effect."
+    log_message "Updating PATH in .zshrc for brew at /usr/local/bin..."
+    echo "export PATH=\"/usr/local/bin:\$PATH\"" >> ~/.zshrc || handle_error $? "Failed to update .zshrc"
+    log_message "Please restart your terminal or run 'source ~/.zshrc' for future sessions."
 else
-    log_message "PATH already contains Homebrew bin directory."
+    log_message "PATH already updated in .zshrc."
 fi
 
 # Step 4: Install pigz
 log_message "Checking for pigz installation..."
 if command_exists pigz; then
-    log_message "pigz is already installed. Skipping installation."
+    log_message "pigz is already installed."
 else
     log_message "Installing pigz..."
     brew install pigz || handle_error $? "Failed to install pigz"
-    log_message "pigz installation completed."
+    log_message "pigz installed successfully."
 fi
 
-# Step 5: Create and activate Python virtual environment
+# Step 5: Create and activate virtual environment
 log_message "Creating virtual environment 'local_llms'..."
-python3 -m venv local_llms || handle_error $? "Failed to create virtual environment"
+"$PYTHON_CMD" -m venv local_llms || handle_error $? "Failed to create virtual environment"
 
 log_message "Activating virtual environment..."
-if [ -f "local_llms/bin/activate" ]; then
-    source local_llms/bin/activate || handle_error $? "Failed to activate virtual environment"
-else
-    handle_error 1 "Virtual environment activation script not found."
-fi
+source local_llms/bin/activate || handle_error $? "Failed to activate virtual environment"
 log_message "Virtual environment activated."
 
 # Step 6: Install llama.cpp
-log_message "Checking existing llama.cpp installation..."
-if command -v llama-cli &>/dev/null; then
+log_message "Checking for llama.cpp installation..."
+if command_exists llama; then
     log_message "llama.cpp is installed. Checking for updates..."
     if brew outdated | grep -q "llama.cpp"; then
-        log_message "A newer version of llama.cpp is available. Upgrading..."
-        brew upgrade llama.cpp || handle_error $? "Failed to upgrade llama.cpp"
+        log_message "Upgrading llama.cpp..."
+        brew upgrade personally.cpp || handle_error $? "Failed to upgrade llama.cpp"
         log_message "llama.cpp upgraded successfully."
     else
-        log_message "llama.cpp is already at the latest version."
+        log_message "llama.cpp is up to date."
     fi
 else
-    log_message "No llama.cpp installation found. Installing..."
+    log_message "Installing llama.cpp..."
     brew install llama.cpp || handle_error $? "Failed to install llama.cpp"
-    log_message "llama.cpp installation completed."
+    log_message "llama.cpp installed successfully."
 fi
 
-log_message "Verifying the installed llama.cpp version..."
+log_message "Verifying llama.cpp version..."
 hash -r
 llama-cli --version || handle_error $? "llama.cpp verification failed"
 log_message "llama.cpp setup complete."
 
-# Step 7: Set up local-llms toolkit
+# Step 7: Install local-llms toolkit
 log_message "Setting up local-llms toolkit..."
-# Check if local-llms is already installed
-if pip3 show local-llms &>/dev/null; then
-    log_message "local-llms is already installed. Checking for updates..."
-    pip3 install -q --upgrade git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to update local-llms toolkit"
-    log_message "local-llms toolkit is now up to date."
+if pip show local-llms &>/dev/null; then
+    log_message "local-llms is installed. Updating..."
+    pip install --upgrade git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to update local-llms toolkit"
+    log_message "local-llms toolkit updated."
 else
-    log_message "Installing local-llms toolkit for the first time..."
-    pip3 install -q git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to install local-llms toolkit"
-    log_message "local-llms toolkit installed successfully."
+    log_message "Installing local-llms toolkit..."
+    pip install git+https://github.com/eternalai-org/local-llms.git || handle_error $? "Failed to install local-llms toolkit"
+    log_message "local-llms toolkit installed."
 fi
 
-log_message "All steps completed successfully."
+log_message "Setup completed successfully."
